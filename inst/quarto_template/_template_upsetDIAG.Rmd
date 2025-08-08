@@ -1,0 +1,13 @@
+```{r}
+#library(ggVennDiagram)
+library(upsetjs)
+
+
+
+
+upsetjs() %>%  fromList(data ) %>% interactiveChart() 
+#ggVennDiagram(data, fill_color = c("#F4E7C6FF", "#A12A19FF","#979461FF"))
+
+
+
+```

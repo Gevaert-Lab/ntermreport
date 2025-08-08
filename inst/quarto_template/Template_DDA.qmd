@@ -1,0 +1,234 @@
+---
+title: "Nterminal Enriched DDA `r params$title`"
+subtitle: "`r params$subtitle`"
+author: "`r params$author`"
+format: 
+  html:
+    fig-width: 12
+    fig-height: 10
+    toc: true
+    toc-title: 'N-term Report'
+    title-block-banner: '#1b2944'
+    title-block-banner-color: '#f79646'
+
+execute: 
+  echo: false
+  warning: false
+embed-resources: true
+theme: 
+ - layout/brand 
+ - layout/custom.scss
+
+params:
+  description: ""
+  design_file: ""
+  input_file: ""
+  folder_prj: ""
+  title: ""
+  subtitle: ""
+  author: "" 
+  sample_stat: ""
+  grp_stat: ""
+  glb_stat: ""
+  grp_uniqprot: ""
+  sample_uniqprot: ""
+  acetyl_stat: ""
+  acd4_stat: ""
+---
+
+
+```{r input}
+#| output: false
+ required_packages = c("ggrepel","ggplot","reactable",
+                       "plotly","DT",'gridExtra','ggVennDiagram','dplyr' ,'logger','pander','yaml','upsetjs')
+ ntermreport::check_dependencies(required_packages)
+
+ st=format(Sys.time(), "%Y%m%d_%H%M")
+write(as.yaml(params), file =  file.path( params$folder_prj, paste0("NtermDDA_parameter_",st  , ".yaml")))
+
+theme_custom_vis <- function(base_size = 12) {
+  theme_bw(base_size = base_size) %+replace%
+    theme(
+      # leggend
+      legend.title = element_text(size = rel(0.85), face = "bold"),
+      legend.text = element_text(size = rel(0.70), face = "bold"),
+      legend.key = element_rect(fill = "transparent", colour = NA),
+      legend.key.size = unit(1.5, "lines"),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      strip.background = element_rect(fill = "#bababa", color = "black"),
+      strip.text = element_text(size = rel(0.85), face = "bold", color = "#1b2944", margin = margin(5,0,5,0))
+    )
+}
+
+theme_set(theme_custom_vis(base_size = 18))
+
+
+```
+
+# Statistics 
+
+
+```{r import_data}
+
+L <- readLines(params$design_file, n = 1)
+    if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
+
+glb_df  <-  readRDS(params$glb_stat )
+grp_df <-  readRDS(params$grp_stat )
+smp_df <-   readRDS(params$sample_stat )
+
+grp_l <-  readRDS(params$grp_uniqprot )
+smp_l <-   readRDS(params$sample_uniqprot )
+
+acetyl_df <-  readRDS(params$acetyl_stat )
+acd4_df <-  readRDS(params$acd4_stat)
+
+```
+
+
+## Global Level 
+
+```{r glb_viz}
+
+DT::datatable( glb_df ,
+             extensions = c('FixedColumns', 'Scroller'),
+             options = list(fixedColumns = TRUE, scrollY = 400, scrollX = TRUE,
+                            scroller = TRUE, dom = 'Bfrtip', autoWidth = TRUE
+             ),
+ ) %>%  formatRound(columns = 'percentage', digits = 4)  
+
+
+```
+
+
+## Group Level 
+
+```{r grp_viz}
+
+reactable(grp_df, groupBy = "group", columns = list(
+  percentage = colDef(format = colFormat(percent = FALSE, digits = 2,suffix='%'))
+  )
+)
+```
+
+
+
+## Sample Level 
+
+```{r smp_viz}
+
+
+reactable(smp_df, groupBy = "sample", columns = list(
+  percentage = colDef(format = colFormat(percent = FALSE, digits = 2,suffix='%'))
+  ))
+```
+
+
+# Unique Proteins Detected 
+
+##  Among Group 
+
+```{r grp_venn}
+upsetjs() %>%  fromList(grp_l ) %>% interactiveChart() 
+
+#ggVennDiagram(grp_l, fill_color = c("#ec6628", "#41b7b8"))
+```
+
+## within Group
+
+::: panel-tabset
+```{r  tab_venn}
+#| results: asis
+grp_ <- expdesign %>% distinct(Group) %>% pull(Group)
+
+for (g in grp_) {
+    log_info( paste0('  --  ',g)) 
+
+    #cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '## ', paste(g,sep=' '), '\n\n')
+    cat ('Upset plot of the unique protein found in each sample \n')
+    sample_ <- expdesign %>% filter(Group == g ) %>% pull(Sample)
+    my_list_refined <- smp_l[sample_]
+    
+    ntermreport::render_child(data = my_list_refined ,
+                 label = g , 
+                 path= "",  
+                 template='_template_upsetDIAG.Rmd') 
+    cat('\n\n')
+
+}
+
+```
+
+:::
+
+
+# Acetyl peptides across group 
+
+## TIS 
+
+```{r acetyl_tis}
+
+group_names <- unique(expdesign$Group)
+my_list <- list()
+
+for ( g_ in group_names) {
+  my_list[[g_]] <- acetyl_df[[g_]]$p_start_$pep_seq
+}
+
+upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+
+#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
+
+```
+
+## aTIS
+
+```{r acetyl_atis}
+
+group_names <- unique(expdesign$Group)
+my_list <- list()
+
+for ( g_ in group_names) {
+  my_list[[g_]] <- acetyl_df[[g_]]$p_atis$pep_seq
+}
+upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+
+#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
+
+```
+
+
+#  Acd4 peptides across group 
+
+
+# aTIS
+```{r acd4_tis}
+
+group_names <- unique(expdesign$Group)
+my_list <- list()
+
+for ( g_ in group_names) {
+  my_list[[g_]] <- acd4_df[[g_]]$p_start_$pep_seq
+}
+upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+
+#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
+
+```
+
+
+# TIS
+```{r acd4_atis}
+
+group_names <- unique(expdesign$Group)
+my_list <- list()
+
+for ( g_ in group_names) {
+  my_list[[g_]] <- acd4_df[[g_]]$p_atis$pep_seq
+}
+upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+
+#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
+
+```

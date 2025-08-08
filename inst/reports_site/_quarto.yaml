@@ -1,0 +1,17 @@
+project:
+  type: website
+
+website:
+  title: "N Terminal Proteomics"
+  navbar:
+    background: '#1b2944'
+    logo: layout/images/vib_cmb_pos.jpg
+    left:
+      - text: "Home"
+        href: index.html
+      - text: "N-Term Report"
+        href: nterm_report.html
+      - text: "DIA Report"
+        href: dia_report.html
+theme: 
+      - layout/brand.yml

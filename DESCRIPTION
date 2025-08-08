@@ -1,0 +1,37 @@
+Package: ntermreport
+Type: Package
+Title: N-terminal proteomics data analysis 
+Version: 0.99.0
+Authors@R: c(
+    person(
+      "Andrea", "Argentini",
+      email = "andrea.argentini@vib-ugent.be",
+      role = c("aut", "cre")
+    )
+  )
+Description: This is still work-in progress
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    fs,
+    yaml,
+    assertthat,
+    dplyr,
+    utils,
+    logger,
+    magrittr, 
+    quarto,
+    withr,
+    BiocManager,
+    purrr,
+    tibble,
+    tidyr,
+    withr,
+    glue,
+    openxlsx,
+    diareport
+Suggests: 
+    testthat (>= 3.0.0),
+    knitr
+RoxygenNote: 7.3.2
