@@ -1,0 +1,79 @@
+```{r}
+#| echo: false
+
+card_id <- paste0("card-", gsub("[^a-zA-Z0-9]", "-", data$name))
+collapse_id <- paste0("collapse-", card_id)
+
+div(
+  class = "accordion-item",
+  div(
+    class = "accordion-header",
+    id = paste0("heading-", card_id),
+    h4(
+      class = "accordion-button collapsed d-flex justify-content-between align-items-center",
+      `data-bs-toggle` = "collapse",
+      `data-bs-target` = paste0("#", collapse_id),
+      `aria-expanded` = "false",
+      `aria-controls` = collapse_id,
+      div(
+        data$name,
+        span(
+          class = "badge bg-secondary ms-2",
+          sprintf("Count: %d", data$count)
+        )
+      )
+    )
+  ),
+  div(
+    id = collapse_id,
+    class = "accordion-collapse collapse",
+    `aria-labelledby` = paste0("heading-", card_id),
+    `data-bs-parent` = "#intersection-accordion",
+    div(
+      class = "accordion-body",
+      p(class = "card-text text-muted", data$set_indicators),
+      if (length(data$elements) > 0) {
+        if ( ! label == 'protein'){
+            datatable(
+            data.frame(Elements = data$elements),
+            options = list(
+              pageLength = 5,
+              dom = 'Bfrtip',
+              scrollY = "200px",
+              scrollCollapse = TRUE,
+              buttons = c('copy', 'csv', 'excel'),
+              language = list(
+                search = 'Filter:',
+                info = 'Showing _START_ to _END_ of _TOTAL_ elements'
+              )
+            ),
+            extensions = 'Buttons',
+            rownames = FALSE,
+            class = 'cell-border stripe hover'
+          )
+        }else{
+          datatable(
+            data.frame(Elements = data$elements, Protein = data$protein),
+            options = list(
+              pageLength = 20,
+              dom = 'Bfrtip',
+              scrollY = "200px",
+              scrollCollapse = TRUE,
+              buttons = c('copy', 'csv', 'excel'),
+              language = list(
+                search = 'Filter:',
+                info = 'Showing _START_ to _END_ of _TOTAL_ elements'
+              )
+            ),
+            extensions = 'Buttons',
+            rownames = FALSE,
+            class = 'cell-border stripe hover'
+          )
+        }
+      } else {
+        p("No elements in this intersection")
+      }
+    )
+  )
+)
+```

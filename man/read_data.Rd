@@ -4,7 +4,7 @@
 \alias{read_data}
 \title{read_data}
 \usage{
-read_data(file_nterm, file_expdesign)
+read_data(file_nterm, file_expdesign, grp_selected)
 }
 \arguments{
 \item{file_nterm}{Path to input mascot report}

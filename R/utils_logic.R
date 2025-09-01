@@ -1,3 +1,80 @@
+#' @author andrea argentini
+#' @title view_intersection
+#' @description
+#'  Helper function to view intersection (same as before)
+#' @param df  
+#' @param sets 
+#' @param exclusive 
+#' @return none
+
+view_intersection <- function(df, sets = list(), exclusive = TRUE) {
+  mask <- rep(TRUE, nrow(df))
+  for (set_name in names(sets)) {
+    if (sets[[set_name]]) {
+      mask <- mask & df[[set_name]]
+    } else {
+      mask <- mask & !df[[set_name]]
+    }
+  }
+  return(df$Elements[mask])
+}
+
+
+#' @author andrea argentini
+#' @title get_all_intersections
+#' @description
+#' Modified get_all_intersections function to include additional metadata
+#' @param df  
+#' @return results
+#' @export
+get_all_intersections <- function(df) {
+  # Get set names (column names that are logical/boolean)
+  set_names <- names(df)[sapply(df, is.logical)]
+  n_sets <- length(set_names)
+  
+  n_combinations <- 2^n_sets - 1
+  combinations <- list()
+  
+  for(i in 1:n_combinations) {
+    binary <- as.integer(intToBits(i))[1:n_sets]
+    combo <- as.list(as.logical(binary))
+    names(combo) <- set_names
+    
+    present_sets <- set_names[binary == 1]
+    if(length(present_sets) == 1) {
+      label <- paste(present_sets, "only")
+    } else {
+      label <- paste(present_sets, collapse = " ∩ ")
+    }
+    
+    combinations[[label]] <- combo
+  }
+  
+  results <- list()
+  for (name in names(combinations)) {
+    elements <- view_intersection(df, combinations[[name]])
+    results[[name]] <- list(
+      elements = elements,
+      count = length(elements),
+      sets = combinations[[name]]  # Store the set combination
+    )
+  }
+  
+  return(results)
+}
+
+#' @author andrea argentini
+#' @title create_set_indicators
+#' @description
+#' Function to create a visual representation of set membership
+#' @param sets  
+#' @return none
+#' @export
+# Function to create a visual representation of set membership
+create_set_indicators <- function(sets) {
+  indicators <- sapply(sets, function(x) if(x) "✓" else "×")
+  paste(names(indicators), indicators, sep = ": ", collapse = " | ")
+}
 
 
 #' @author andrea argentini
@@ -208,7 +285,7 @@ check_length_design_data  <- function  (data_ , design){
 #' @return Data frame with imported data
 #' @importFrom  dplyr mutate left_join join_by select
 #' @importFrom utils read.csv read.csv2 read.table
-read_data <- function(file_nterm, file_expdesign) {
+read_data <- function(file_nterm, file_expdesign, grp_selected) {
 
   tryCatch( expr = {
 
@@ -218,6 +295,22 @@ read_data <- function(file_nterm, file_expdesign) {
     ## add  possible control
     L <- readLines(file_expdesign, n = 1)
     if (grepl(";", L)) design <- read.csv2(file_expdesign) else design <- read.csv(file_expdesign)
+    
+
+    if   (all( grp_selected != '')){
+        if (length(grp_selected) >= 2 ){
+           if  (   (! all(grp_selected %in% (design %>% distinct(Group) %>% pull(Group) )) ) ) {
+            return( list(error= paste0( 'select_group values :',  paste(grp_selected, collapse = ", ")  ,
+            ' are not in the group values provided in the design file\n Possible values are :' , paste(design %>% distinct(Group) , collapse = ", ") ),
+             status= 1 ,nterm_data =  NULL, df_design = NULL ))
+
+            }
+        }else{
+          return( list(error= 'select_group must contain at least two values',status= 1 ,nterm_data =  NULL, df_design = NULL ))
+        }
+
+    }  
+   
 
     # add exp design to output
 

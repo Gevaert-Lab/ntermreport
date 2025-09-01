@@ -27,6 +27,7 @@ params:
   title: ""
   subtitle: ""
   author: "" 
+  select_group: ""
   sample_stat: ""
   grp_stat: ""
   glb_stat: ""
@@ -37,10 +38,120 @@ params:
 ---
 
 
-```{r input}
+```{css css_set_up}
+/* Custom CSS for better visualization */
+.card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0.75rem 1.25rem;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.badge {
+  font-size: 0.9em;
+  padding: 0.5em 1em;
+}
+
+.elements-table {
+  margin-top: 1rem;
+}
+
+.dataTables_wrapper {
+  padding: 10px;
+}
+.card-header {
+  transition: background-color 0.3s ease;
+}
+
+.card-header:hover {
+  background-color: #e9ecef;
+}
+
+.collapse-icon {
+  transition: transform 0.3s ease;
+}
+
+.card-header[aria-expanded="true"] .collapse-icon {
+  transform: rotate(180deg);
+}
+
+/* Animate collapse */
+.collapse {
+  transition: height 0.35s ease;
+}
+
+/* Optional: Style to show which card is active */
+.card-header[aria-expanded="true"] {
+  background-color: #e9ecef;
+  border-bottom: none;
+}
+
+/* Add spacing between header elements */
+.card-title {
+  margin-bottom: 0;
+}
+
+.card-subtitle {
+  margin-top: 0.5rem;
+}
+
+/* Ensure the chevron icon aligns properly */
+.fas {
+  width: 1em;
+  text-align: center;
+}
+```
+
+```{js js_set_up}
+// Add this JavaScript to handle the chevron rotation
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.card-header').forEach(header => {
+    header.addEventListener('click', function() {
+      const isExpanded = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', !isExpanded);
+    });
+  });
+  
+  // Show first card by default (optional)
+  const firstCard = document.querySelector('.collapse');
+  if (firstCard) {
+    new bootstrap.Collapse(firstCard, {
+      toggle: false
+    }).show();
+  }
+});
+```
+
+```{r import_data}
+
+L <- readLines(params$design_file, n = 1)
+    if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
+
+glb_df  <-  readRDS(params$glb_stat )
+grp_df <-  readRDS(params$grp_stat )
+smp_df <-   readRDS(params$sample_stat )
+
+grp_l <-  readRDS(params$grp_uniqprot )
+smp_l <-   readRDS(params$sample_uniqprot )
+
+acetyl_df <-  readRDS(params$acetyl_stat )
+acd4_df <-  readRDS(params$acd4_stat)
+
+```
+
+```{r load_packg_set_up}
 #| output: false
  required_packages = c("ggrepel","ggplot","reactable",
-                       "plotly","DT",'gridExtra','ggVennDiagram','dplyr' ,'logger','pander','yaml','upsetjs')
+                       "plotly","DT",'gridExtra','ggVennDiagram','dplyr' ,'logger','pander','yaml','upsetjs','htmltools','purrr')
  ntermreport::check_dependencies(required_packages)
 
  st=format(Sys.time(), "%Y%m%d_%H%M")
@@ -62,28 +173,25 @@ theme_custom_vis <- function(base_size = 12) {
 
 theme_set(theme_custom_vis(base_size = 18))
 
+if (all(params$select_group != '')) {
+  log_info(paste0('Selected groups: ',paste(params$select_group,collapse = ' '  )))
+  grp_l <- grp_l[params$select_group]
+  #grp_ <- params$select_group
+  grp_names <-  params$select_group
+}else{
+   #grp_ <- unique(expdesign$Group)
+   grp_names <- unique(expdesign$Group)}
+
 
 ```
+
+## Experiment Description
+
+`r params$description`
+
 
 # Statistics 
 
-
-```{r import_data}
-
-L <- readLines(params$design_file, n = 1)
-    if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
-
-glb_df  <-  readRDS(params$glb_stat )
-grp_df <-  readRDS(params$grp_stat )
-smp_df <-   readRDS(params$sample_stat )
-
-grp_l <-  readRDS(params$grp_uniqprot )
-smp_l <-   readRDS(params$sample_uniqprot )
-
-acetyl_df <-  readRDS(params$acetyl_stat )
-acd4_df <-  readRDS(params$acd4_stat)
-
-```
 
 
 ## Global Level 
@@ -129,19 +237,65 @@ reactable(smp_df, groupBy = "sample", columns = list(
 ##  Among Group 
 
 ```{r grp_venn}
-upsetjs() %>%  fromList(grp_l ) %>% interactiveChart() 
+upsetjs() %>%  fromList(grp_l ) %>% generateDistinctIntersections()
+
+## other library
+#upset(fromList(grp_l), order.by = "freq", nsets = length(listInput) )
+
+all_elements <- unique(unlist(grp_l))
+
+# Build logical membership table
+intersection_df <- data.frame(
+  Elements = all_elements,
+  sapply(names(grp_l), function(nm) all_elements %in% grp_l[[nm]])
+)
+
+all_intersections <- ntermreport::get_all_intersections(intersection_df)
 
 #ggVennDiagram(grp_l, fill_color = c("#ec6628", "#41b7b8"))
 ```
+```{r grp_list_intersection}
+#| results: asis
+      cat('<div class="accordion" id="intersection-accordion">')
+
+  # Sort intersections by count (descending)
+  sorted_names <- names(all_intersections)[order(
+    sapply(all_intersections, function(x) x$count),
+    decreasing = TRUE
+  )]
+
+  # Generate individual sections for each intersection
+  for (name in sorted_names) {
+    data <- all_intersections[[name]]
+    
+  # Prepare parameters for the child document
+    lista <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    
+    ntermreport::render_child(data = lista ,
+                 label = '' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+   cat('</div>')
+```
+
 
 ## within Group
 
 ::: panel-tabset
-```{r  tab_venn}
+```{r  within_grp_inter_venn}
 #| results: asis
-grp_ <- expdesign %>% distinct(Group) %>% pull(Group)
 
-for (g in grp_) {
+#grp_names <- expdesign %>% distinct(Group) %>% pull(Group)
+
+
+
+for (g in grp_names) {
     log_info( paste0('  --  ',g)) 
 
     #cmp_label <- gsub(params$contrast,'',cmp )
@@ -154,7 +308,44 @@ for (g in grp_) {
                  label = g , 
                  path= "",  
                  template='_template_upsetDIAG.Rmd') 
-    cat('\n\n')
+    ## -- visual intersections elements ------
+    all_elements <- unique(unlist(my_list_refined))
+
+  # Build logical membership table
+   intersection_df_ <- data.frame(
+    Elements = all_elements,
+    sapply(names(my_list_refined), function(nm) all_elements %in% my_list_refined[[nm]])
+  )
+
+    all_intersections_ <- ntermreport::get_all_intersections(intersection_df_)
+
+    cat('<div class="accordion" id="intersection-accordion">')
+
+  # Sort intersections by count (descending)
+  sorted_names <- names(all_intersections_)[order(
+    sapply(all_intersections_, function(x) x$count),
+    decreasing = TRUE
+  )]
+
+  # Generate individual sections for each intersection
+  for (name in sorted_names) {
+    data_ <- all_intersections_[[name]]
+    
+  # Prepare parameters for the child document
+    lista_ <- list(
+      name = name,
+      count = data_$count,
+      elements = data_$elements,
+      set_indicators = ntermreport::create_set_indicators(data_$sets)
+    )
+    
+    ntermreport::render_child(data = lista_ ,
+                 label = '' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }   
+  # close for the vis.intersection      
+  cat('</div>')
 
 }
 
@@ -169,66 +360,279 @@ for (g in grp_) {
 
 ```{r acetyl_tis}
 
-group_names <- unique(expdesign$Group)
 my_list <- list()
+my_protein <- list()
 
-for ( g_ in group_names) {
+for ( g_ in grp_names) {
   my_list[[g_]] <- acetyl_df[[g_]]$p_start_$pep_seq
+  #my_deb[[g_]] <- acetyl_df[[g_]]$p_start_
+  my_protein[[g_]] <-  acetyl_df[[g_]]$p_start %>% select(prot_acc,pep_seq)
 }
 
-upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+## select(prot_acc,pep_seq, prot_desc )
+#ann_df <- reduce(my_protein, function(x, y) left_join(x, y, by = c("prot_acc", "pep_seq")))
 
-#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
+ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
+
+upsetjs() %>%  fromList(my_list ) %>%  generateDistinctIntersections()
+
+all_elements <- unique(unlist(my_list))
+
+# Build logical membership table
+intersection_df <- data.frame(
+  Elements = all_elements,
+  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+)
+
+all_intersections <- ntermreport::get_all_intersections(intersection_df)
+
 
 ```
+```{r acetyl_tis_intersection}
+#| results: asis
+      cat('<div class="accordion" id="intersection-accordion">')
+
+  # Sort intersections by count (descending)
+  sorted_names <- names(all_intersections)[order(
+    sapply(all_intersections, function(x) x$count),
+    decreasing = TRUE
+  )]
+
+  # Generate individual sections for each intersection
+  for (name in sorted_names) {
+    data <- all_intersections[[name]]
+    
+    prot_map <- ann_df %>%
+     filter(pep_seq %in% data$elements) %>%
+     group_by(pep_seq) %>%
+     summarise(proteins = list(prot_acc), .groups = "drop")
+
+  # Prepare parameters for the child document
+    lista <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =  prot_map <- prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  select(protein_ids),
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    
+    ntermreport::render_child(data = lista ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+
+  cat('</div>') 
+```
+
+
 
 ## aTIS
 
 ```{r acetyl_atis}
 
-group_names <- unique(expdesign$Group)
 my_list <- list()
+my_protein <- list()
 
-for ( g_ in group_names) {
+for ( g_ in grp_names) {
   my_list[[g_]] <- acetyl_df[[g_]]$p_atis$pep_seq
+  my_protein[[g_]] <-  acetyl_df[[g_]]$p_atis %>% select(prot_acc,pep_seq)
 }
-upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+upsetjs() %>%  fromList(my_list ) %>% generateDistinctIntersections()
 
-#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
+
+ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
+
+all_elements <- unique(unlist(my_list))
+
+# Build logical membership table
+intersection_df <- data.frame(
+  Elements = all_elements,
+  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+)
+
+all_intersections_atis <- ntermreport::get_all_intersections(intersection_df)
 
 ```
+
+```{r acetyl_atis_intersection}
+#| results: asis
+    cat('<div class="accordion" id="intersection-accordion">')
+
+  # Sort intersections by count (descending)
+  sorted_names <- names(all_intersections_atis)[order(
+    sapply(all_intersections_atis, function(x) x$count),
+    decreasing = TRUE
+  )]
+
+  # Generate individual sections for each intersection
+  for (name in sorted_names) {
+    data <- all_intersections_atis[[name]]
+    
+    prot_map <- ann_df %>%
+     filter(pep_seq %in% data$elements) %>%
+     group_by(pep_seq) %>%
+     summarise(proteins = list(prot_acc), .groups = "drop")
+
+  # Prepare parameters for the child document
+    lista <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =   prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  select(protein_ids),
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    
+    ntermreport::render_child(data = lista ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+  cat('</div>') 
+```
+
 
 
 #  Acd4 peptides across group 
 
-
-# aTIS
+## TIS
 ```{r acd4_tis}
 
-group_names <- unique(expdesign$Group)
 my_list <- list()
+my_protein <- list()
 
-for ( g_ in group_names) {
+for ( g_ in grp_names) {
   my_list[[g_]] <- acd4_df[[g_]]$p_start_$pep_seq
+  my_protein[[g_]] <-  acd4_df[[g_]]$p_start %>% select(prot_acc,pep_seq)
+
 }
-upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+upsetjs() %>%  fromList(my_list ) %>% generateDistinctIntersections()
+
+
+ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
+
+all_elements <- unique(unlist(my_list))
+
+# Build logical membership table
+intersection_df <- data.frame(
+  Elements = all_elements,
+  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+)
+
+all_intersections_acd4_tis <- ntermreport::get_all_intersections(intersection_df)
 
 #ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
 
 ```
 
 
-# TIS
+
+```{r acd4_tis_intersection}
+#| results: asis
+      cat('<div class="accordion" id="intersection-accordion">')
+
+  # Sort intersections by count (descending)
+  sorted_names <- names(all_intersections_acd4_tis)[order(
+    sapply(all_intersections_acd4_tis, function(x) x$count),
+    decreasing = TRUE
+  )]
+
+  # Generate individual sections for each intersection
+  for (name in sorted_names) {
+    log_info(paste0('acd4_tis ',name))
+    data <- all_intersections_acd4_tis[[name]]
+    log_info(paste0('acd4_tis length',  length(data$elements)))
+    prot_map <- ann_df %>%
+     filter(pep_seq %in% data$elements) %>%
+     group_by(pep_seq) %>%
+     summarise(proteins = list(prot_acc), .groups = "drop")
+    log_info(paste0('acd4_tis prot_map ',  dim(prot_map),collapse = ' '))
+  # Prepare parameters for the child document
+    lista <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =   prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  select(protein_ids),
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    
+    ntermreport::render_child(data = lista ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+  cat('</div>') 
+```
+
+## aTIS
 ```{r acd4_atis}
 
-group_names <- unique(expdesign$Group)
 my_list <- list()
-
-for ( g_ in group_names) {
+my_protein <- list()
+for ( g_ in grp_names) {
   my_list[[g_]] <- acd4_df[[g_]]$p_atis$pep_seq
+    my_protein[[g_]] <-  acd4_df[[g_]]$p_atis %>% select(prot_acc,pep_seq)
+
 }
-upsetjs() %>%  fromList(my_list ) %>% interactiveChart() 
+upsetjs() %>%  fromList(my_list ) %>% generateDistinctIntersections()
+
+ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
+
+all_elements <- unique(unlist(my_list))
+
+# Build logical membership table
+intersection_df <- data.frame(
+  Elements = all_elements,
+  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+)
+
+all_intersections_acd4_atis <- ntermreport::get_all_intersections(intersection_df)
 
 #ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
 
+```
+
+```{r acd4_atis_intersection}
+#| results: asis
+      cat('<div class="accordion" id="intersection-accordion">')
+
+  # Sort intersections by count (descending)
+  sorted_names <- names(all_intersections_acd4_atis)[order(
+    sapply(all_intersections_acd4_tis, function(x) x$count),
+    decreasing = TRUE
+  )]
+
+  # Generate individual sections for each intersection
+  for (name in sorted_names) {
+    log_info(paste0('acd4_tis ',name))
+    data <- all_intersections_acd4_atis[[name]]
+    log_info(paste0('acd4_tis length',  length(data$elements)))
+    prot_map <- ann_df %>%
+     filter(pep_seq %in% data$elements) %>%
+     group_by(pep_seq) %>%
+     summarise(proteins = list(prot_acc), .groups = "drop")
+    log_info(paste0('acd4_tis prot_map ',  dim(prot_map),collapse = ' '))
+  # Prepare parameters for the child document
+    lista <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =   prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  select(protein_ids),
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    
+    ntermreport::render_child(data = lista ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+  cat('</div>') 
 ```

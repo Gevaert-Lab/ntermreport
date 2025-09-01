@@ -54,15 +54,24 @@ The three main functions to render HTML reports are:
 
     It renders an HTML report for the N-terminal–enriched DDA analysis, starting from the Mascot PSM file.
 
-| Prameter | Description |
+List of the input parameters:
+
+| Pameter | Description |
 |------------------|------------------------------------------------------|
 | **`input_file`** | Full path to the **processed proteomics results file** (e.g., PSM, peptide, or protein table) generated from the N-terminal enriched DDA experiment. |
 | **`design_file`** | Full path to the **experimental design CSV file**, containing sample names, conditions, and grouping information. |
 | **`folder_prj`** | Path to the folder where the **report output and intermediate results** will be saved. |
-| **`description`** | Short text describing the experiment’s purpose or biological context (appears in the report header). |
+| **`description`** | Short text describing the experiment’s purpose or biological context. |
 | **`title`** | Main title for the report. |
 | **`subtitle`** | Secondary title, often used to indicate experiment type (e.g., “N-Terminal”). |
 | **`author`** | Name(s) of the report author(s), shown in the report header. |
+| **`select_group`**| groups to be include in the comparison. If empty all group values will be used. At least two groups *must* be indicated e.g. ```c('GrpA','GrpB'))``` |
+
+Function parameters:
+
+| Pameter | Description |
+|------------------|------------------------------------------------------|
+| **`params`**| a list of parameters described above |
 | **`template`** | Name of the **Quarto template file** used to generate the report (e.g., `Template_DDA.qmd`). |
 | **`report_folder`** | Folder where the final report will be stored (usually the same as `folder_prj`). |
 | **`report_filename`** | Name of the output report file (e.g., `test.html`). |
@@ -81,7 +90,8 @@ params <- list(
   description = 'N-terminal enrichment on retina samples',
   title       = 'CMB - XXYY',
   subtitle    = "N-Terminal",
-  author      = 'Your Name'
+  author      = 'Your Name',
+  select_group= c('GrpA','GrpB')
 )
 
 # To run the analysis:
@@ -99,7 +109,7 @@ render_nterm_report(
 
 | Parameter | Description |
 |------------------|------------------------------------------------------|
-| **`params_dda`** | A **named list of parameters** passed to the N-terminal enriched **DDA** report rendering function. Defines input files, metadata, and analysis settings for the DDA workflow. |
+| **`params_dda`** | A **named list of parameters** passed to the N-terminal enriched **DDA** report rendering function. Defines input files, metadata, and analysis settings for the DDA workflow. See the parameters described above|
 | **`params_dia`** | A **named list of parameters** passed to the **DIA** report rendering function. Defines input files, metadata, and analysis settings for the DIA workflow. |
 | **`template_dda`** | Full path to the **Quarto template** (`.qmd`) used to generate the N-terminal enriched DDA report. |
 | **`report_folder`** | Directory where the **final rendered website/report** will be saved. Must be writable and preferably empty before rendering. |

@@ -106,6 +106,9 @@ validate_params_minimal <- function(params) {
     folder_prj = list(type= "string"
     )
     ,
+    select_group =list(type="character"
+    )
+    ,
     description= list(
       type = "string"
     ),
@@ -236,6 +239,24 @@ render_nterm_website <- function ( params_dda , params_dia , template_dda, repor
 
 
 
+#' @title merge_default_parameters
+#'
+#' @param params_int parameters
+#' @return merged parameters
+#' @importFrom yaml read_yaml
+merge_default_parameters <- function  ( params_int  ){
+
+  yaml_path <- system.file("config", "default_parameter.yaml", package = "ntermreport")
+  default_p <- read_yaml(yaml_path )
+
+  miss <- base::setdiff(names(default_p$params), names(params_int))
+   for (a in miss) {
+     params_int[[a]] <- default_p$params[[a]] }
+
+  return (params_int)
+}
+
+
 #' @author andrea Argentini
 #' @title Render a DDA report using a Quarto template
 #'
@@ -268,8 +289,10 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   validate_folder(report_folder)
   validate_filename( filename = report_filename)
   ## to be changed
-  #params_report <- merge_default_parameters(params_report)
-
+  
+  debug(merge_default_parameters)
+  params_report <- merge_default_parameters(params_report)
+  undebug(merge_default_parameters)
   validate_params_minimal(params_report)
 
   # other set up
@@ -283,7 +306,7 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
 
   log_info ('Start ...')
   #debug(read_data)
-  res <- read_data( params_report$input_file, params_report$design_file)
+  res <- read_data( params_report$input_file, params_report$design_file, params_report$select_group)
   #undebug(read_data)
   if (res$status == 1) stop(res$error)
   ## get global statistics
@@ -346,8 +369,6 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
 
   saveRDS(res_b$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_group.RDS'  ))
   saveRDS(res_c$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_sample.RDS'  ))
-  saveRDS(res_c$l_uniq_protein,  'l_uniqueprot_sample.RDS'  )
-
 
   params_report$glb_stat <-   file.path(temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
   params_report$grp_stat<-   file.path(temp_work_dir,basename(template_source_folder),'group_stat.RDS'  )
@@ -410,6 +431,5 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   # Optionally, remove the temporary working directory to clean up
   unlink(temp_work_dir, recursive = TRUE)
 
-  return (-1)
 
 }

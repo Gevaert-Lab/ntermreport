@@ -4,7 +4,7 @@
 \alias{render_quarto_index}
 \title{render_quarto_index}
 \usage{
-render_quarto_index(report_info, out_file = "", title = "My Analysis Website")
+render_quarto_index(report_info, out_file = "", title = "")
 }
 \description{
 render_quarto_index
