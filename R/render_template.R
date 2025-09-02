@@ -43,7 +43,7 @@ validate_folder <- function(report_folder) {
   dir.create(file.path( report_folder, "Result"),recursive = TRUE)
 
   # Check if the folder path is writable
-  assertthat::assert_that(assertthat::is.writeable(report_folder), msg = "The folder path is not writable.")
+  #assertthat::assert_that(assertthat::is.writeable(report_folder), msg = "The folder path is not writable.")
 
   TRUE
 }
@@ -187,6 +187,7 @@ This site contains the following reports:
 #'  @return
 #' Invisibly returns the path to the final website in \code{report_folder}.
 #' @importFrom withr with_dir
+#' @export
 render_nterm_website <- function ( params_dda , params_dia , template_dda, report_folder, template_dia , project_id ){
   temp_work_dir_web <- file.path(tempdir(), paste0("website_", Sys.getpid()))
   dir.create(temp_work_dir_web, recursive = TRUE, showWarnings = FALSE)
@@ -290,9 +291,9 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   validate_filename( filename = report_filename)
   ## to be changed
   
-  debug(merge_default_parameters)
+  #debug(merge_default_parameters)
   params_report <- merge_default_parameters(params_report)
-  undebug(merge_default_parameters)
+  #undebug(merge_default_parameters)
   validate_params_minimal(params_report)
 
   # other set up
