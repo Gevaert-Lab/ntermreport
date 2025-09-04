@@ -53,7 +53,7 @@ div(
           )
         }else{
           datatable(
-            data.frame(Elements = data$elements, Protein = data$protein),
+            data.frame(Peptide = data$elements, Protein_Ids = data$proteins, Description = data$protein_description),
             options = list(
               pageLength = 20,
               dom = 'Bfrtip',
