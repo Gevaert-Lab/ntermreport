@@ -373,7 +373,6 @@ for ( g_ in grp_names) {
 #ann_df <- reduce(my_protein, function(x, y) left_join(x, y, by = c("prot_acc", "pep_seq")))
 
 ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq,prot_desc)
-saveRDS(ann_df,'c:\\Users\\Andrea/workspace\\ntermreport\\prot_df.Rds')
 
 upsetjs() %>%  fromList(my_list ) %>%  generateDistinctIntersections()
 
@@ -387,7 +386,6 @@ intersection_df <- data.frame(
 
 all_intersections <- ntermreport::get_all_intersections(intersection_df)
 
-saveRDS(all_intersections,'c:\\Users\\Andrea\\workspace\\ntermreport\\interaction.Rds')
 ```
 ```{r acetyl_tis_intersection}
 #| results: asis
