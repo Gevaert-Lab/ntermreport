@@ -7,13 +7,17 @@
 create_set_indicators(sets)
 }
 \arguments{
-\item{sets}{}
+\item{sets}{A named logical list indicating membership of each set.}
 }
 \value{
-none
+A character string with formatted set indicators, e.g. 
+  `"SetA: ✓ | SetB: × | SetC: ✓"`.
 }
 \description{
-Function to create a visual representation of set membership
+Creates a compact human-readable summary of set membership indicators.  
+Each set is annotated with a checkmark ("✓") if included (`TRUE`) or 
+a cross ("×") if excluded (`FALSE`), and the results are concatenated 
+into a single string.
 }
 \author{
 andrea argentini

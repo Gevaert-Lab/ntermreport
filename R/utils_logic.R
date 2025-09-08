@@ -1,11 +1,17 @@
 #' @author andrea argentini
 #' @title view_intersection
 #' @description
-#'  Helper function to view intersection (same as before)
-#' @param df  
-#' @param sets 
-#' @param exclusive 
-#' @return none
+#' Given a membership table (logical columns for sets and an `Elements` column), 
+#' this function extracts the elements belonging to the intersection of sets 
+#' defined in `sets`. If `exclusive = TRUE`, the mask is applied strictly: 
+#' - `TRUE` means the element must belong to the set, 
+#' - `FALSE` means the element must not belong to the set.  
+#' The result is the subset of `Elements` that satisfy all inclusion/exclusion conditions.
+#' @param df A data.frame containing at least one column named `Elements` and logical columns representing set membership.
+#' @param sets A named list of logicals indicating for each set whether it should be included (`TRUE`) or excluded (`FALSE`) in the intersection.
+#' @param exclusive Logical; if `TRUE` (default), elements must match the exact inclusion/exclusion pattern defined in `sets`.
+#' @return A character vector of element identifiers satisfying the intersection conditions.
+
 
 view_intersection <- function(df, sets = list(), exclusive = TRUE) {
   mask <- rep(TRUE, nrow(df))
@@ -20,13 +26,28 @@ view_intersection <- function(df, sets = list(), exclusive = TRUE) {
 }
 
 
+
 #' @author andrea argentini
 #' @title get_all_intersections
 #' @description
-#' Modified get_all_intersections function to include additional metadata
-#' @param df  
-#' @return results
+#' Computes all non-empty intersections of logical set membership columns 
+#' in a given data frame.  
+#' It systematically generates all possible combinations of inclusion/exclusion 
+#' across the sets (2^n - 1 combinations for n sets), evaluates which elements 
+#' belong to each combination using `view_intersection()`, and returns only 
+#' those intersections that contain one or more elements.  
+#' Each intersection includes its name, the matched elements, their count, 
+#' and the logical definition of the combination.
+#' @param df A data.frame with one `Elements` column and one or more logical columns (each representing membership in a set).
+#' @return A named list where each entry corresponds to a non-empty intersection, 
+#'   containing:
+#'   \describe{
+#'     \item{elements}{Character vector of elements in the intersection}
+#'     \item{count}{Integer count of elements}
+#'     \item{sets}{Named logical list describing which sets were included/excluded}
+#'   }
 #' @export
+
 get_all_intersections <- function(df) {
   # Get set names (column names that are logical/boolean)
   set_names <- names(df)[sapply(df, is.logical)]
@@ -53,24 +74,29 @@ get_all_intersections <- function(df) {
   results <- list()
   for (name in names(combinations)) {
     elements <- view_intersection(df, combinations[[name]])
-    results[[name]] <- list(
-      elements = elements,
-      count = length(elements),
-      sets = combinations[[name]]  # Store the set combination
-    )
+        elements <- elements[!is.na(elements) & elements != ""]
+    if ( length(elements) >= 1) {  # keep only intersections with more than one element
+      results[[name]] <- list(
+        elements = elements,
+        count = length(elements),
+        sets = combinations[[name]]
+      )
+   }
   }
-  
   return(results)
 }
 
 #' @author andrea argentini
 #' @title create_set_indicators
 #' @description
-#' Function to create a visual representation of set membership
-#' @param sets  
-#' @return none
+#' Creates a compact human-readable summary of set membership indicators.  
+#' Each set is annotated with a checkmark ("✓") if included (`TRUE`) or 
+#' a cross ("×") if excluded (`FALSE`), and the results are concatenated 
+#' into a single string.
+#' @param sets A named logical list indicating membership of each set.
+#' @return A character string with formatted set indicators, e.g. 
+#'   `"SetA: ✓ | SetB: × | SetC: ✓"`.
 #' @export
-# Function to create a visual representation of set membership
 create_set_indicators <- function(sets) {
   indicators <- sapply(sets, function(x) if(x) "✓" else "×")
   paste(names(indicators), indicators, sep = ": ", collapse = " | ")
@@ -159,7 +185,6 @@ write_final_result = function(  acetyl, acd4 , quant_base ,  group_l, path  ){
 ## make it only for specific pairwise condition like A, B and A in B and B in A 
 
 tryCatch( expr = {  
-  #log_info(paste(group_l, collapse = ' '))
   
   acetyl <- annotate_df(acetyl, type= 'p_start_', groups = group_l)
     
@@ -246,8 +271,8 @@ check_length_design_data  <- function  (data_ , design){
   data_sample <-  data_ %>% dplyr::distinct(Run) %>% pull()
   ## filename does not exist
   d_sample <- design %>% dplyr::distinct(Run) %>% pull()
-  log_info(paste0(data_sample,collapse = ' '))
-  log_info(paste0(d_sample,collapse = ' '))
+  #log_info(paste0(data_sample,collapse = ' '))
+  #log_info(paste0(d_sample,collapse = ' '))
 
   if (length(data_sample) < length(d_sample)){
 
@@ -296,22 +321,33 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
     L <- readLines(file_expdesign, n = 1)
     if (grepl(";", L)) design <- read.csv2(file_expdesign) else design <- read.csv(file_expdesign)
     
+    valid_groups <- design %>% dplyr::distinct(Group) %>% dplyr::pull(Group)
 
-    if   (all( grp_selected != '')){
-        if (length(grp_selected) >= 2 ){
-           if  (   (! all(grp_selected %in% (design %>% distinct(Group) %>% pull(Group) )) ) ) {
-            return( list(error= paste0( 'select_group values :',  paste(grp_selected, collapse = ", ")  ,
-            ' are not in the group values provided in the design file\n Possible values are :' , paste(design %>% distinct(Group) , collapse = ", ") ),
-             status= 1 ,nterm_data =  NULL, df_design = NULL ))
-
-            }
-        }else{
-          return( list(error= 'select_group must contain at least two values',status= 1 ,nterm_data =  NULL, df_design = NULL ))
-        }
-
-    }  
-   
-
+    for (nm in names(grp_selected)) {
+      grp_set <- grp_selected[[nm]]
+    
+      # Check that each group set has ≥ 2 values
+      if (length(grp_set) < 1) {
+        return(list(
+          error = paste0(" select_group '", nm, "' must contain at least one list"),
+          status = 1, nterm_data = NULL, df_design = NULL
+        ))
+      }
+    
+    # Check that all values exist in design
+      invalid <- setdiff(grp_set, valid_groups)
+      if (length(invalid) > 0) {
+        return(list(
+          error = paste0(
+            "List  -> '", nm, "' of select_group contains invalid values: ",
+            paste(invalid, collapse = ", "),
+            "\nPossible values are: ", paste(valid_groups, collapse = ", ")
+          ),
+          status = 1, nterm_data = NULL, df_design = NULL
+        ))
+      }
+    }
+    
     # add exp design to output
 
     df <- df %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
@@ -359,7 +395,7 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
 
 group_stat <- function(d_nterm) {
 
-  log_info('Group Statistics Starting ...')
+  log_info('Group Statistics Start ...')
 
   filter_<- list( '','','',   '*Gln->pyro-Glu*',
                   '*Acetyl (N-term)*',
@@ -400,14 +436,14 @@ group_stat <- function(d_nterm) {
     )
   }))
   rownames(res_df) <- NULL
-  log_info('Group Statistics Ends ...')
+  log_info('Group Statistics End ...')
   },error = function(err){
     print(paste("Group Statistics :  ",err))
     return( list(error= err, status= 1,res =NULL ,l_uniq_protein =NULL))
   })
 
   tryCatch( expr = {
-  log_info('Group Unique protein Starting ...')
+  log_info('Group Unique protein Start ...')
 
   ## protein unique list
   distinct_proteins_list <- lapply(groups, function(group_name) {
@@ -416,7 +452,7 @@ group_stat <- function(d_nterm) {
     return(unique_proteins)
   })
   names(distinct_proteins_list) <- groups
-  log_info('Group Unique protein Ends ...')
+  log_info('Group Unique protein End ...')
 
   },error = function(err){
     print(paste("Group unique protein :  ",err))
@@ -445,7 +481,7 @@ group_stat <- function(d_nterm) {
 
 sample_stat <- function(d_nterm) {
 
-  log_info('Sample Statistics Starting ...')
+  log_info('Sample Statistics Start ...')
 
   filter_<- list( '','','',   '*Gln->pyro-Glu*',
                   '*Acetyl (N-term)*',
@@ -486,7 +522,7 @@ sample_stat <- function(d_nterm) {
       )
     }))
     rownames(res_df) <- NULL
-    log_info('Sample Statistics Ends ...')
+    log_info('Sample Statistics End ...')
     },error = function(err){
       print(paste("Sample Stats Computation :  ",err))
       return( list(error= err, status= 1,q_feat =NULL ))
@@ -494,7 +530,7 @@ sample_stat <- function(d_nterm) {
 
   ## protein unique list
 
-  log_info('Sample Unique protein  Starting ...')
+  log_info('Sample Unique protein  Start ...')
   tryCatch( expr = {
   distinct_proteins_list <- lapply(samples, function(sample_name) {
     g_ <- d_nterm %>% filter(Sample == sample_name)
@@ -502,7 +538,7 @@ sample_stat <- function(d_nterm) {
     return(unique_proteins)
   })
   names(distinct_proteins_list) <- samples
-  log_info('Sample Unique protein Ends ...')
+  log_info('Sample Unique protein End ...')
 
   },error = function(err){
     print(paste("Unique protein  samples :  ",err))
@@ -526,7 +562,7 @@ sample_stat <- function(d_nterm) {
 
 global_stat <- function(d_nterm) {
 
-  log_info('Global Statistics Starting ...')
+  log_info('Global Statistics Start ...')
 
   filter_option <- list('*Gln->pyro-Glu*',
                         '*Acetyl (N-term)*',
@@ -552,9 +588,9 @@ global_stat <- function(d_nterm) {
     )
 
     rownames(res) <- NULL
-
+    log_info('Global Statistics End ...')
     return( list(error= '', status= 0,  res = res ))
-    log_info('Global Statistics Ends ...')
+    
   },error = function(err){
     print(paste("Global Stat :  ",err))
     return( list(error= err, status= 1,res =NULL ))
@@ -579,20 +615,20 @@ global_stat <- function(d_nterm) {
 process_filter <- function(filter_pattern, filter_label, data,countpeptides ) {
     ## total
     if (filter_label == 'total') {
-      log_info(filter_label)
+      #log_info(filter_label)
       #data %>% dim(data)[1]
       count_main <- dim( data)[1]
       percentage_main = NaN
     }
     if (filter_label == 'unique_peptide') {
-      log_info(filter_label)
+      #log_info(filter_label)
       # unique peptide
       #dim(data %>%  distinct(,pep_modified_seq, .keep_all= TRUE))[1]
       count_main <- dim(data %>%  distinct(pep_modified_seq, .keep_all= TRUE))[1]
       percentage_main = NaN
     }
     if (filter_label == 'unique_protein') {
-      log_info(filter_label)
+      #log_info(filter_label)
       # uniqueprotein
       #dim(data %>%  distinct(prot_acc, .keep_all= TRUE))[1]
       count_main = dim(data %>%  distinct(prot_acc, .keep_all= TRUE))[1]
@@ -601,21 +637,21 @@ process_filter <- function(filter_pattern, filter_label, data,countpeptides ) {
     if (filter_label %in% c('pyroglu_','ace','AcD4','C-terminal','NH2')){
 
       if (filter_label == 'C-terminal') {
-        log_info(paste(filter_pattern, collapse = ' '))
+        #log_info(paste(filter_pattern, collapse = ' '))
         filtered_data <- data %>%
           filter(
             !grepl(filter_pattern[[1]], pep_seq, fixed = FALSE),
             !grepl(filter_pattern[[2]], pep_var_mod, fixed = FALSE)
           )
       }else if (filter_label == "NH2"){
-        log_info(paste(filter_pattern, collapse = ' '))
+        #log_info(paste(filter_pattern, collapse = ' '))
         filtered_data <- data %>%
           filter(
             grepl(filter_pattern[[1]], pep_seq, fixed = FALSE),
             !grepl(filter_pattern[[2]], pep_var_mod, fixed = FALSE)
           )
       } else {
-        log_info(paste(filter_pattern, collapse = ' '))
+        #log_info(paste(filter_pattern, collapse = ' '))
         filtered_data <- data %>%
           filter(grepl(filter_pattern, pep_var_mod, fixed = FALSE))
       }
@@ -641,7 +677,7 @@ process_filter <- function(filter_pattern, filter_label, data,countpeptides ) {
 #' @importFrom  dplyr filter
 
 quant_base_ <- function(d_nterm){
-    log_info('Quant Valid Base Extraction ...')
+    log_info('Quant Valid Base Extraction Start...')
 
   tryCatch( expr = {
     groups <- d_nterm %>% distinct(Group) %>% pull()
@@ -654,7 +690,7 @@ quant_base_ <- function(d_nterm){
     })
 
     names(res__) <- groups
-
+     log_info('Quant Valid Base Extraction End ...')
         return( list(error= '', status= 0, res =  res__ ))
 
     },error = function(err){
@@ -675,7 +711,7 @@ quant_base_ <- function(d_nterm){
 
 acetyl_stat_ <- function(d_nterm) {
 
-  log_info('Acetyl Statistics ...')
+  log_info('Acetyl Statistics Start...')
 
   tryCatch( expr = {
     groups <- d_nterm %>% distinct(Group) %>% pull()
@@ -705,6 +741,7 @@ acetyl_stat_ <- function(d_nterm) {
     })
     names(res__processed) <- groups
 
+      log_info('Acetyl Statistics End ...')
 
     return( list(error= '', status= 0, res = res__processed ))
   }, error = function(err){
@@ -727,7 +764,7 @@ acetyl_stat_ <- function(d_nterm) {
 
 acd4_stat_ <- function(d_nterm) {
 
-  log_info('acd4 Statistics ...')
+  log_info('ACD4 Statistics Start ...')
 
   tryCatch( expr = {
     groups <- d_nterm %>% distinct(Group) %>% pull()
@@ -757,6 +794,7 @@ acd4_stat_ <- function(d_nterm) {
     })
     names(res__processed) <- groups
 
+    log_info('acd4 Statistics ends ...')
 
     return( list(error= '', status= 0,  res = res__processed ))
    } ,error = function(err){
