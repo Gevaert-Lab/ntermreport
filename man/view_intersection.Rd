@@ -7,17 +7,22 @@
 view_intersection(df, sets = list(), exclusive = TRUE)
 }
 \arguments{
-\item{df}{}
+\item{df}{A data.frame containing at least one column named `Elements` and logical columns representing set membership.}
 
-\item{sets}{}
+\item{sets}{A named list of logicals indicating for each set whether it should be included (`TRUE`) or excluded (`FALSE`) in the intersection.}
 
-\item{exclusive}{}
+\item{exclusive}{Logical; if `TRUE` (default), elements must match the exact inclusion/exclusion pattern defined in `sets`.}
 }
 \value{
-none
+A character vector of element identifiers satisfying the intersection conditions.
 }
 \description{
-Helper function to view intersection (same as before)
+Given a membership table (logical columns for sets and an `Elements` column), 
+this function extracts the elements belonging to the intersection of sets 
+defined in `sets`. If `exclusive = TRUE`, the mask is applied strictly: 
+- `TRUE` means the element must belong to the set, 
+- `FALSE` means the element must not belong to the set.  
+The result is the subset of `Elements` that satisfy all inclusion/exclusion conditions.
 }
 \author{
 andrea argentini

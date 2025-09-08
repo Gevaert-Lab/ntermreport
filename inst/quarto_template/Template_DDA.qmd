@@ -172,27 +172,21 @@ theme_custom_vis <- function(base_size = 12) {
 }
 
 theme_set(theme_custom_vis(base_size = 18))
-
 if (all(params$select_group != '')) {
   log_info(paste0('Selected groups: ',paste(params$select_group,collapse = ' '  )))
-  grp_l <- grp_l[params$select_group]
-  #grp_ <- params$select_group
-  grp_names <-  params$select_group
-}else{
-   #grp_ <- unique(expdesign$Group)
-   grp_names <- unique(expdesign$Group)}
+  selec_group_l <-  params$select_group
+
+  all_group_ <- unique(expdesign$Group)
+  }
 
 
 ```
 
-## Experiment Description
+# Experiment Description
 
 `r params$description`
 
-
 # Statistics 
-
-
 
 ## Global Level 
 
@@ -208,7 +202,6 @@ DT::datatable( glb_df ,
 
 ```
 
-
 ## Group Level 
 
 ```{r grp_viz}
@@ -218,7 +211,6 @@ reactable(grp_df, groupBy = "group", columns = list(
   )
 )
 ```
-
 
 
 ## Sample Level 
@@ -236,7 +228,7 @@ reactable(smp_df, groupBy = "sample", columns = list(
 
 ##  Among Group 
 
-```{r grp_venn}
+```{r grp_upset}
 upsetjs() %>%  fromList(grp_l ) %>% generateDistinctIntersections()
 
 ## other library
@@ -251,6 +243,7 @@ intersection_df <- data.frame(
 )
 
 all_intersections <- ntermreport::get_all_intersections(intersection_df)
+all_intersections <- all_intersections[sapply(all_intersections, function(x) x$count > 0)]
 
 #ggVennDiagram(grp_l, fill_color = c("#ec6628", "#41b7b8"))
 ```
@@ -288,14 +281,10 @@ all_intersections <- ntermreport::get_all_intersections(intersection_df)
 ## within Group
 
 ::: panel-tabset
-```{r  within_grp_inter_venn}
+```{r  protein_data_per_group}
 #| results: asis
 
-#grp_names <- expdesign %>% distinct(Group) %>% pull(Group)
-
-
-
-for (g in grp_names) {
+for (g in all_group_) {
     log_info( paste0('  --  ',g)) 
 
     #cmp_label <- gsub(params$contrast,'',cmp )
@@ -318,7 +307,7 @@ for (g in grp_names) {
   )
 
     all_intersections_ <- ntermreport::get_all_intersections(intersection_df_)
-
+    all_intersections_ <- all_intersections_[sapply(all_intersections_, function(x) x$count > 0)]
     cat('<div class="accordion" id="intersection-accordion">')
 
   # Sort intersections by count (descending)
@@ -358,123 +347,64 @@ for (g in grp_names) {
 
 ## TIS 
 
-```{r acetyl_tis}
 
-my_list <- list()
-my_protein <- list()
-
-for ( g_ in grp_names) {
-  my_list[[g_]] <- acetyl_df[[g_]]$p_start_$pep_seq
-  #my_deb[[g_]] <- acetyl_df[[g_]]$p_start_
-  my_protein[[g_]] <-  acetyl_df[[g_]]$p_start %>% select(prot_acc,pep_seq)
-}
-
-## select(prot_acc,pep_seq, prot_desc )
-#ann_df <- reduce(my_protein, function(x, y) left_join(x, y, by = c("prot_acc", "pep_seq")))
-
-ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
-
-upsetjs() %>%  fromList(my_list ) %>%  generateDistinctIntersections()
-
-all_elements <- unique(unlist(my_list))
-
-# Build logical membership table
-intersection_df <- data.frame(
-  Elements = all_elements,
-  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
-)
-
-all_intersections <- ntermreport::get_all_intersections(intersection_df)
-
-
-```
-```{r acetyl_tis_intersection}
+::: panel-tabset
+```{r acetyl_tis_I}
 #| results: asis
-      cat('<div class="accordion" id="intersection-accordion">')
 
-  # Sort intersections by count (descending)
-  sorted_names <- names(all_intersections)[order(
-    sapply(all_intersections, function(x) x$count),
-    decreasing = TRUE
-  )]
+for (cmp_name in names(selec_group_l)){
+    log_info( paste0('  --  ',cmp_name)) 
 
-  # Generate individual sections for each intersection
-  for (name in sorted_names) {
-    data <- all_intersections[[name]]
-    
-    prot_map <- ann_df %>%
-     filter(pep_seq %in% data$elements) %>%
-     group_by(pep_seq) %>%
-     summarise(proteins = list(prot_acc), .groups = "drop")
-
-  # Prepare parameters for the child document
-    lista <- list(
-      name = name,
-      count = data$count,
-      elements = data$elements,
-      proteins =  prot_map <- prot_map %>% 
-                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
-                  select(protein_ids),
-      set_indicators = ntermreport::create_set_indicators(data$sets)
-    )
-    
-    ntermreport::render_child(data = lista ,
-                 label = 'protein' , 
+    #cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '## ', paste(cmp_name,sep=' '), '\n\n')
+    #cat ('Upset plot of the unique protein found in each sample \n')
+    grp_value <- selec_group_l[[cmp_name]]
+    log_info(paste(grp_value,collapse= ''))
+    my_list <- list()
+    my_protein <- list()
+    for ( g_ in grp_value) {
+      log_info(g_)
+      my_list[[g_]] <- acetyl_df[[g_]]$p_start_$pep_seq
+      my_protein[[g_]] <-  acetyl_df[[g_]]$p_start %>% select(prot_acc,pep_seq,prot_desc)
+    }
+     
+    ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq,prot_desc)
+    ntermreport::render_child(data = my_list ,
+                 label = g , 
                  path= "",  
-                 template='_template_intersection.Rmd') 
-  }
+                 template='_template_upsetDIAG.Rmd') 
 
-  cat('</div>') 
-```
+    my_list <- my_list[sapply(my_list, length) > 0]
+    log_info('List length: ')
+    log_info( paste0(length(my_list),collapse= ' '))
 
+    all_elements <- unique(unlist(my_list))
+    all_elements <- all_elements[!is.na(all_elements)]
+    # Build logical membership table
+    intersection_acetyl_tis <- data.frame(
+      Elements = all_elements,
+      sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+    )
 
+    all_intersections_acetyl_tis <- ntermreport::get_all_intersections(intersection_acetyl_tis)
+    all_intersections_acetyl_tis <- all_intersections_acetyl_tis[sapply(all_intersections_acetyl_tis, function(x) x$count > 0)]
 
-## aTIS
-
-```{r acetyl_atis}
-
-my_list <- list()
-my_protein <- list()
-
-for ( g_ in grp_names) {
-  my_list[[g_]] <- acetyl_df[[g_]]$p_atis$pep_seq
-  my_protein[[g_]] <-  acetyl_df[[g_]]$p_atis %>% select(prot_acc,pep_seq)
-}
-upsetjs() %>%  fromList(my_list ) %>% generateDistinctIntersections()
-
-
-ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
-
-all_elements <- unique(unlist(my_list))
-
-# Build logical membership table
-intersection_df <- data.frame(
-  Elements = all_elements,
-  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
-)
-
-all_intersections_atis <- ntermreport::get_all_intersections(intersection_df)
-
-```
-
-```{r acetyl_atis_intersection}
-#| results: asis
+    # prev old one stops
     cat('<div class="accordion" id="intersection-accordion">')
 
-  # Sort intersections by count (descending)
-  sorted_names <- names(all_intersections_atis)[order(
-    sapply(all_intersections_atis, function(x) x$count),
-    decreasing = TRUE
-  )]
+    # Sort intersections by count (descending)
+    sorted_names <- names(all_intersections_acetyl_tis)[order(
+      sapply(all_intersections_acetyl_tis, function(x) x$count),
+      decreasing = TRUE
+    )]
 
   # Generate individual sections for each intersection
   for (name in sorted_names) {
-    data <- all_intersections_atis[[name]]
-    
+    data <- all_intersections_acetyl_tis[[name]]
     prot_map <- ann_df %>%
      filter(pep_seq %in% data$elements) %>%
      group_by(pep_seq) %>%
-     summarise(proteins = list(prot_acc), .groups = "drop")
+     summarise(proteins = list(prot_acc),  protein_description = list(prot_desc) ,.groups = "drop")
 
   # Prepare parameters for the child document
     lista <- list(
@@ -483,74 +413,179 @@ all_intersections_atis <- ntermreport::get_all_intersections(intersection_df)
       elements = data$elements,
       proteins =   prot_map %>% 
                   mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
-                  select(protein_ids),
+                  pull(protein_ids),
+      protein_description =   prot_map %>%    
+                  mutate(protein_description = sapply(protein_description, paste, collapse = "; ")) %>%
+                  pull(protein_description) ,
       set_indicators = ntermreport::create_set_indicators(data$sets)
     )
+    log_info(name)
+    log_info(length(lista$proteins))
+    log_info(length(lista$protein_description))
+    log_info(length(lista$elements))
     
+  
     ntermreport::render_child(data = lista ,
                  label = 'protein' , 
                  path= "",  
                  template='_template_intersection.Rmd') 
   }
+
   cat('</div>') 
+
+ }
 ```
 
+:::
 
+
+## aTIS
+
+::: panel-tabset
+```{r acetyl_atis_I}
+#| results: asis
+
+for (cmp_name in names(selec_group_l)){ 
+
+    cat( '## ', paste(cmp_name,sep=' '), '\n\n')
+    grp_value <- selec_group_l[[cmp_name]]
+    log_info(paste(grp_value,collapse= ''))
+    my_list <- list()
+    my_protein <- list()
+    for ( g_ in grp_value) {
+      my_list[[g_]] <- acetyl_df[[g_]]$p_atis$pep_seq
+      my_protein[[g_]] <-  acetyl_df[[g_]]$p_atis %>% select(prot_acc,pep_seq,prot_desc)
+    }
+   ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq,prot_desc)
+    
+    ntermreport::render_child(data = my_list ,
+                 label = g , 
+                 path= "",  
+                 template='_template_upsetDIAG.Rmd') 
+    my_list <- my_list[sapply(my_list, length) > 0]
+    log_info('List length: ')
+    log_info( paste0(length(my_list),collapse= ' '))
+
+    all_elements <- unique(unlist(my_list)) 
+    all_elements <- all_elements[!is.na(all_elements)]
+    # Build logical membership table
+    intersection_df_acetyl_atis <- data.frame(
+      Elements = all_elements,
+      sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+    )
+
+    all_intersections_acetyl_atis <- ntermreport::get_all_intersections(intersection_df_acetyl_atis)
+
+    all_intersections_acetyl_atis <- all_intersections_acetyl_atis[sapply(all_intersections_acetyl_atis, function(x) x$count > 0)]
+
+    cat('<div class="accordion" id="intersection-accordion">')
+
+    # Sort intersections by count (descending)
+    sorted_names <- names(all_intersections_acetyl_atis)[order(
+      sapply(all_intersections_acetyl_atis, function(x) x$count),
+      decreasing = TRUE
+    )]
+
+  # Generate individual sections for each intersection
+    for (name in sorted_names) {
+        data <- all_intersections_acetyl_atis[[name]]
+        
+        prot_map <- ann_df %>%
+        filter(pep_seq %in% data$elements) %>%
+        group_by(pep_seq) %>%
+        summarise(proteins = list(prot_acc),  protein_description = list(prot_desc),.groups = "drop")
+
+        lista <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =   prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  pull(protein_ids),
+      protein_description =   prot_map %>%    
+                  mutate(protein_description = sapply(protein_description, paste, collapse = "; ")) %>%
+                  pull(protein_description) ,
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    log_info(name)
+    log_info(length(lista$proteins))
+    log_info(length(lista$protein_description))
+    log_info(length(lista$elements))
+    
+  
+    ntermreport::render_child(data = lista ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+
+  cat('</div>') 
+}
+```
+
+:::
 
 #  Acd4 peptides across group 
 
 ## TIS
-```{r acd4_tis}
 
-my_list <- list()
-my_protein <- list()
-
-for ( g_ in grp_names) {
-  my_list[[g_]] <- acd4_df[[g_]]$p_start_$pep_seq
-  my_protein[[g_]] <-  acd4_df[[g_]]$p_start %>% select(prot_acc,pep_seq)
-
-}
-upsetjs() %>%  fromList(my_list ) %>% generateDistinctIntersections()
-
-
-ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
-
-all_elements <- unique(unlist(my_list))
-
-# Build logical membership table
-intersection_df <- data.frame(
-  Elements = all_elements,
-  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
-)
-
-all_intersections_acd4_tis <- ntermreport::get_all_intersections(intersection_df)
-
-#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
-
-```
-
-
-
-```{r acd4_tis_intersection}
+::: panel-tabset
+```{r acd4_tis_I }
 #| results: asis
-      cat('<div class="accordion" id="intersection-accordion">')
 
-  # Sort intersections by count (descending)
-  sorted_names <- names(all_intersections_acd4_tis)[order(
-    sapply(all_intersections_acd4_tis, function(x) x$count),
-    decreasing = TRUE
-  )]
+for (cmp_name in names(selec_group_l)){
+    log_info( paste0('  --  ',cmp_name)) 
+    #cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '## ', paste(cmp_name,sep=' '), '\n\n')
+    #cat ('Upset plot of the unique protein found in each sample \n')
+    grp_value <- selec_group_l[[cmp_name]]
+    log_info(paste(grp_value,collapse= ''))
+    my_list <- list()
+    my_protein <- list()
 
-  # Generate individual sections for each intersection
+    for ( g_ in grp_value) {
+      my_list[[g_]] <- acd4_df[[g_]]$p_start_$pep_seq
+      my_protein[[g_]] <-  acd4_df[[g_]]$p_start %>% select(prot_acc,pep_seq,prot_desc)
+
+    }
+    
+   ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq,prot_desc)
+    ntermreport::render_child(data = my_list ,
+                 label = g_ , 
+                 path= "",  
+                 template='_template_upsetDIAG.Rmd') 
+    log_info('List length: ')
+    my_list <- my_list[sapply(my_list, length) > 0]
+    log_info( paste0(length(my_list),collapse= ' '))
+
+    all_elements <- unique(unlist(my_list))
+    all_elements <- all_elements[!is.na(all_elements)]
+    # Build logical membership table
+    intersection_df_acd4_tis <- data.frame(
+      Elements = all_elements,
+      sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+    )
+
+    all_intersections_acd4_tis <- ntermreport::get_all_intersections(intersection_df_acd4_tis)
+    all_intersections_acd4_tis <- all_intersections_acd4_tis[sapply(all_intersections_acd4_tis, function(x) x$count > 0)]
+
+    log_info( paste(names(all_intersections_acd4_tis), collapse= ' '))
+
+    # prev old one stops
+    cat('<div class="accordion" id="intersection-accordion">')
+
+    sorted_names <- names(all_intersections_acd4_tis)[order(
+      sapply(all_intersections_acd4_tis, function(x) x$count),
+      decreasing = TRUE
+    )]
   for (name in sorted_names) {
-    log_info(paste0('acd4_tis ',name))
     data <- all_intersections_acd4_tis[[name]]
-    log_info(paste0('acd4_tis length',  length(data$elements)))
+    
     prot_map <- ann_df %>%
      filter(pep_seq %in% data$elements) %>%
      group_by(pep_seq) %>%
-     summarise(proteins = list(prot_acc), .groups = "drop")
-    log_info(paste0('acd4_tis prot_map ',  dim(prot_map),collapse = ' '))
+     summarise(proteins = list(prot_acc),  protein_description = list(prot_desc) ,.groups = "drop")
+
   # Prepare parameters for the child document
     lista <- list(
       name = name,
@@ -558,66 +593,91 @@ all_intersections_acd4_tis <- ntermreport::get_all_intersections(intersection_df
       elements = data$elements,
       proteins =   prot_map %>% 
                   mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
-                  select(protein_ids),
+                  pull(protein_ids),
+      protein_description =   prot_map %>%    
+                  mutate(protein_description = sapply(protein_description, paste, collapse = "; ")) %>%
+                  pull(protein_description) ,
       set_indicators = ntermreport::create_set_indicators(data$sets)
     )
+    log_info(name)
+    log_info(length(lista$proteins))
+    log_info(length(lista$protein_description))
+    log_info(length(lista$elements))
     
+  
     ntermreport::render_child(data = lista ,
                  label = 'protein' , 
                  path= "",  
                  template='_template_intersection.Rmd') 
   }
+
   cat('</div>') 
+
+ }
+
 ```
+
+:::
 
 ## aTIS
-```{r acd4_atis}
 
-my_list <- list()
-my_protein <- list()
-for ( g_ in grp_names) {
-  my_list[[g_]] <- acd4_df[[g_]]$p_atis$pep_seq
-    my_protein[[g_]] <-  acd4_df[[g_]]$p_atis %>% select(prot_acc,pep_seq)
-
-}
-upsetjs() %>%  fromList(my_list ) %>% generateDistinctIntersections()
-
-ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq)
-
-all_elements <- unique(unlist(my_list))
-
-# Build logical membership table
-intersection_df <- data.frame(
-  Elements = all_elements,
-  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
-)
-
-all_intersections_acd4_atis <- ntermreport::get_all_intersections(intersection_df)
-
-#ggVennDiagram(my_list, fill_color = c("#ec6628", "#41b7b8"))
-
-```
-
-```{r acd4_atis_intersection}
+::: panel-tabset
+```{r acd4_atis_I}
 #| results: asis
-      cat('<div class="accordion" id="intersection-accordion">')
 
-  # Sort intersections by count (descending)
-  sorted_names <- names(all_intersections_acd4_atis)[order(
-    sapply(all_intersections_acd4_tis, function(x) x$count),
-    decreasing = TRUE
-  )]
+for (cmp_name in names(selec_group_l)){
+    log_info( paste0('  --  ',cmp_name)) 
+
+    #cmp_label <- gsub(params$contrast,'',cmp )
+    cat( '## ', paste(cmp_name,sep=' '), '\n\n')
+    #cat ('Upset plot of the unique protein found in each sample \n')
+    grp_value <- selec_group_l[[cmp_name]]
+    log_info(paste( 'Values : ',grp_value,collapse= ''))
+    my_list_ <- list()
+    my_protein <- list()
+    for ( g_ in grp_value) {
+      my_list_[[g_]] <- acd4_df[[g_]]$p_atis$pep_seq
+        my_protein[[g_]] <-  acd4_df[[g_]]$p_atis %>% select(prot_acc,pep_seq,prot_desc)
+
+    }
+    ann_df <- bind_rows(my_protein) %>% distinct(prot_acc, pep_seq,prot_desc)
+    log_info('List length: ')
+    log_info( paste0(length(my_list_),collapse= ' '))
+    ntermreport::render_child(data = my_list_ ,
+                 label = g_ , 
+                 path= "",  
+                 template='_template_upsetDIAG.Rmd') 
+    my_list_ <- my_list_[sapply(my_list_, length) > 0]
+    all_elements <- unique(unlist(my_list_))
+    all_elements <- all_elements[!is.na(all_elements)]
+    log_info(paste0(length(all_elements),collapse= ' '))
+    # Build logical membership table
+    intersection_df_acd4_atis <- data.frame(
+      Elements = all_elements,
+      sapply(names(my_list_), function(nm) all_elements %in% my_list_[[nm]])
+    )
+
+    aa <- ntermreport::get_all_intersections(intersection_df_acd4_atis)
+    aa <- aa[sapply(aa, function(x) x$count > 0)]
+    log_info( 'After get_all_intersections')
+    log_info( paste( names(aa), collapse= ' '))
+    cat('<div class="accordion" id="intersection-accordion">')
+
+    # Sort intersections by count (descending)
+    sorted_names <- names(aa)[order(
+      sapply(aa, function(x) x$count),
+      decreasing = TRUE
+    )]
 
   # Generate individual sections for each intersection
   for (name in sorted_names) {
-    log_info(paste0('acd4_tis ',name))
-    data <- all_intersections_acd4_atis[[name]]
-    log_info(paste0('acd4_tis length',  length(data$elements)))
+    data <- aa[[name]]
+    
     prot_map <- ann_df %>%
      filter(pep_seq %in% data$elements) %>%
      group_by(pep_seq) %>%
-     summarise(proteins = list(prot_acc), .groups = "drop")
-    log_info(paste0('acd4_tis prot_map ',  dim(prot_map),collapse = ' '))
+     summarise(proteins = list(prot_acc),  protein_description = list(prot_desc) ,.groups = "drop")
+
   # Prepare parameters for the child document
     lista <- list(
       name = name,
@@ -625,14 +685,30 @@ all_intersections_acd4_atis <- ntermreport::get_all_intersections(intersection_d
       elements = data$elements,
       proteins =   prot_map %>% 
                   mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
-                  select(protein_ids),
+                  pull(protein_ids),
+      protein_description =   prot_map %>%    
+                  mutate(protein_description = sapply(protein_description, paste, collapse = "; ")) %>%
+                  pull(protein_description) ,
       set_indicators = ntermreport::create_set_indicators(data$sets)
     )
+    log_info(name)
+    log_info(length(lista$proteins))
+    log_info(length(lista$protein_description))
+    log_info(length(lista$elements))
     
+  
     ntermreport::render_child(data = lista ,
                  label = 'protein' , 
                  path= "",  
                  template='_template_intersection.Rmd') 
   }
+
   cat('</div>') 
+
+ }
+
+
+
 ```
+
+:::

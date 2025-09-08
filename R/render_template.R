@@ -92,6 +92,15 @@ validate_params_minimal <- function(params) {
     }
   }
 
+   check_select_group <- function(x) {
+
+    # Must be a named list
+    if (!is.list(x) || is.null(names(x))) {
+      return(FALSE)
+    }else{
+      return (TRUE)
+    }
+   }
   requirements <- list(
     input_file = list(
       type = "string",
@@ -106,7 +115,10 @@ validate_params_minimal <- function(params) {
     folder_prj = list(type= "string"
     )
     ,
-    select_group =list(type="character"
+
+    select_group =list(type="list",
+     check = check_select_group,
+     msg = "select_group must be a *named list* of group sets"
     )
     ,
     description= list(
@@ -127,12 +139,16 @@ validate_params_minimal <- function(params) {
   for (p in names(requirements)) {
     val <- params[[p]]
     req <- requirements[[p]]
+
     # Type check
     if (req$type == "string") {
       assertthat::assert_that(assertthat::is.string(val), msg = paste0("'", p, "' must be a string."))
     } else if (req$type == "numeric") {
       assertthat::assert_that(is.numeric(val), msg = paste0("'", p, "' must be numeric."))
+    } else if (req$type == "list") {
+      assertthat::assert_that(is.list(val), msg = paste0("'", p, "' must be a list."))
     }
+
     # Value check (if provided)
     if (!is.null(req$check)) {
       assertthat::assert_that(req$check(val), msg = req$msg %||% paste0("Invalid value for '", p, "'."))
@@ -294,8 +310,11 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   #debug(merge_default_parameters)
   params_report <- merge_default_parameters(params_report)
   #undebug(merge_default_parameters)
+  #debug(validate_params_minimal)
   validate_params_minimal(params_report)
-
+  #undebug(validate_params_minimal)
+  
+  
   # other set up
   logger::log_threshold(logger::INFO)
   logger::log_appender(logger::appender_console)
@@ -365,7 +384,6 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   saveRDS(res_c$res, file.path(temp_work_dir,basename(template_source_folder), 'sample_stat.RDS'  ))
   saveRDS(res_acetyl$res, file.path(temp_work_dir,basename(template_source_folder), 'acetyl_stat.RDS'  ))
   saveRDS(res_acd4$res, file.path(temp_work_dir,basename(template_source_folder), 'acd4_stat.RDS'  ))
-
   ## unique protein export
 
   saveRDS(res_b$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_group.RDS'  ))
