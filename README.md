@@ -65,7 +65,7 @@ List of the input parameters:
 | **`title`** | Main title for the report. |
 | **`subtitle`** | Secondary title, often used to indicate experiment type (e.g., “N-Terminal”). |
 | **`author`** | Name(s) of the report author(s), shown in the report header. |
-| **`select_group`**| groups to be include in the comparison. If empty all group values will be used. At least two groups *must* be indicated e.g. ```c('GrpA','GrpB'))``` |
+| **`select_group`** | A list of group names to include in the comparison. It must contain at least one element, and each element must be a valid name from the experimental design column `Group`. Example: `list(Comparison = c("GrpA", "GrpB"))` |
 
 Function parameters:
 
@@ -91,7 +91,7 @@ params <- list(
   title       = 'CMB - XXYY',
   subtitle    = "N-Terminal",
   author      = 'Your Name',
-  select_group= c('GrpA','GrpB')
+  select_group= list(Comparison = c("GrpA", "GrpB"))
 )
 
 # To run the analysis:
@@ -163,7 +163,8 @@ params_dda <- list(
   description = 'N-terminal enrichment on retina samples',
   title       = 'Project - ABCD',
   subtitle    = "N-Terminal",
-  author      = 'Author Name'
+  author      = 'Author Name',
+  select_group = list(Comparison = c("GrpA", "GrpB"))
 )
 render_nterm_website ( params_dda , params_dia , template_dda, report_folder, template_dia , 'CMB-1699 CMB-XXXX' )
 ```
