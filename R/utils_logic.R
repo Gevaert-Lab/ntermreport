@@ -313,8 +313,8 @@ check_length_design_data  <- function  (data_ , design){
 read_data <- function(file_nterm, file_expdesign, grp_selected) {
 
   tryCatch( expr = {
-
-    df <- read.table(file_nterm, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+    #browser()
+    df <-  read.delim(file_nterm, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
     #" add exp design data
 
     ## add  possible control
@@ -349,7 +349,7 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
     }
     
     # add exp design to output
-
+    
     df <- df %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
     # sanity check between data and exp design info 
     checkedLength  <- check_length_design_data (df, design)
@@ -375,7 +375,7 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
     return( list(error= '', status= 0, nterm_data =  df, df_design = design ))
   },error = function(err){
     print(paste("Reading Design / Nterm PSM  file :  ",err))
-    return( list(error= err, status= 1,  nterm_data =  df, df_design = design ))
+    return( list(error= err, status= 1,  nterm_data =  NULL, df_design = NULL ))
 
   } )
 
