@@ -313,7 +313,7 @@ check_length_design_data  <- function  (data_ , design){
 read_data <- function(file_nterm, file_expdesign, grp_selected) {
 
   tryCatch( expr = {
-    #browser()
+    
     df <-  read.delim(file_nterm, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
     #" add exp design data
 
