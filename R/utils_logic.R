@@ -548,6 +548,84 @@ sample_stat <- function(d_nterm) {
   return( list(error= '', status= 0,  res = res_df, l_uniq_protein = distinct_proteins_list ))
 }
 
+#'@author Andrea Argentini
+#' @title  process_filter_wip
+#'
+#' @description  This function apply the right filtering and computed the metrics related,
+#' bot as absolute and percentage values.
+#' @param filter_pattern  reg exp to filter
+#' @param filter_label label of the filter / metrics
+#' @param data  inpute dataframe to filter
+#' @param countpeptides  denominator cardinality of the input dataframe
+#' @return list with computed metrics
+#' @importFrom  dplyr distinct filter join_by select
+#' @importFrom utils read.csv read.csv2 read.table
+#' @importFrom  logger log_info
+
+
+process_filter_wip <- function(filter_item, filter_label, data, countpeptides , task) {
+    ## total
+  
+     print(filter_item$logic)
+    val_count <-  data %>% filter(!! filter_item$logic)  %>% nrow()
+    percentage_main <- if(filter_item$calc_pct) (val_count / countpeptides) else NA
+   
+  
+    return(list(
+      filter_name = filter_label,
+      val_count = val_count,
+      percentage_main = percentage_main
+    ))
+}
+
+
+
+#'@author Andrea Argentini
+#' @title  global_stat_general
+#'
+#' @description Global statistics computed for the entire dataset.Statistic and its labels are
+#' parameters at the moment.
+#' @param d_nterm input n-terminal data frame
+#' @return res dataframe with all the computed metrics
+ #' @importFrom  logger log_info
+
+#'
+
+global_stat_general  <- function(d_nterm, stat_reg, stat_name) {
+
+  log_info('Global Statistics Start ...')
+  #  sorted by num id 
+  # task[1] KNfix
+  # task[2] NH2
+  task <- d_nterm %>% distinct(mascot_task) %>% pull() %>% as.integer() %>% sort() %>%   as.array()
+   
+  countpeptides <- nrow(d_nterm)
+
+  tryCatch( expr = {
+
+    results_list <- lapply(seq_along(stat_reg), function(i) {
+      process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm,countpeptides ,task  )
+    })
+    names(results_list) <- stat_name
+    browser()
+
+    ## result
+    res <- data.frame(
+      label = names(results_list),
+      count_absolute = vapply(results_list, function(x) x$val_count, numeric(1)),
+      percentage = vapply(results_list, function(x) x$percentage_main, numeric(1))
+    )
+
+    rownames(res) <- NULL
+    log_info('Global Statistics End ...')
+    return( list(error= '', status= 0,  res = res ))
+    
+  },error = function(err){
+    print(paste("Global Stat :  ",err))
+    return( list(error= err, status= 1,res =NULL ))
+  })
+}
+
 
 #'@author Andrea Argentini
 #' @title  global_stat

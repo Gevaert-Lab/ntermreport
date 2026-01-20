@@ -302,7 +302,7 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
 
   # Validate parameters
 
-  validate_template( template)
+  #validate_template( template)
   validate_folder(report_folder)
   validate_filename( filename = report_filename)
   ## to be changed
@@ -331,6 +331,32 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   if (res$status == 1) stop(res$error)
   ## get global statistics
 
+  if (template == 'Dev'){
+    #  stat_reg <- list('*Acetyl (N-term)*',
+    #                     '*Gln (N-term)',
+    #                     '*Butyl (N-term)*',
+    #                     list('*R$','*Butyl*'),
+    #                     expr(str_ends(pep_res_before, "R") & grepl('*Butyl*', pep_var_mod, fixed = FALSE)),
+    #                     expr(! str_ends(pep_res_before, "R") &  grepl('*Butyl*', pep_var_mod, fixed = FALSE)),
+    #                     expr(str_detect( pep_seq,'H'))
+    #                    )
+     #stat_name  <- c('Acetylation','Gln-NtermQ','Butylation','C-Terminal','Butylated_r', 'Butylated_nr','H PSMS')
+     stat_reg <- list( list(logic= expr(mascot_task == task[2]), calc_pct = TRUE),
+                      list(logic = expr( mascot_task == task[2] & grepl('*Acetyl (N-term)*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
+                      list(logic =  expr( mascot_task == task[2] & grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
+                      list( logic= expr( mascot_task == task[1] & grepl('*Butyl*', pep_var_mod, fixed = FALSE)),  calc_pct = FALSE) ,
+                      list( logic = expr( mascot_task == task[2] & ! str_ends(pep_seq, "R")) , calc_pct = TRUE),
+                      list( logic = expr( mascot_task == task[1] & grepl('*Butyl*', pep_var_mod, fixed = FALSE) &  pep_res_before =="R" )  , calc_pct = FALSE),
+                      list( logic = expr( mascot_task == task[1] & grepl('*Butyl*', pep_var_mod, fixed = FALSE) &   !(pep_res_before == "R") ) , calc_pct = FALSE),
+                      list( logic = expr( str_detect( pep_seq,'H'))  , calc_pct = TRUE)
+
+                    )
+    stat_name  <- c('Total PSM','Ace','Gln-NtermQ', 'Butyl','Cterminal', 'butylated_R','butylated_notR','H_cont '  )
+     browser()
+    res_a <- global_stat_general( res$nterm_data, stat_reg, stat_name)
+   if (res_a$status == 1) stop(res_a$error)
+  }
+  browser()
   res_a <- global_stat( res$nterm_data)
   if (res_a$status == 1) stop(res_a$error)
   ## group stats
