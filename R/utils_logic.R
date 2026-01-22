@@ -314,7 +314,32 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
 
   tryCatch( expr = {
     
+   folder_path <- dirname(file_nterm)
+
+    # 3. Search for the other file using a regular expression
+    # Example: Look for any PDF file that contains the word "Summary"
+    target_pattern <- "*_output_peptide.tsv"
+
+    matching_files <- list.files(
+      path = folder_path, 
+      pattern = target_pattern , 
+      full.names = TRUE  # This returns the absolute path
+    )
+    if (length(matching_files) > 0) {
+      file_ntermpep <- matching_files[1] 
+      } else if (length(matching_files) > 1) {
+          stop("Multiple peptide files found! Please include only the one relevant with the current experiment.")
+      }else{
+        return(list(
+            error = paste0(" Peptide tsv file not found.\n Check the presence of *_output_peptide.tsv in : ", folder_path, '\n'),
+            status = 1, nterm_data = NULL, df_design = NULL, nterm_pep =NULL
+          ))
+
+    }
+
     df <-  read.delim(file_nterm, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
+
+    df_pep <- read.delim(file_ntermpep, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
     #" add exp design data
 
     ## add  possible control
@@ -330,7 +355,7 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
       if (length(grp_set) < 1) {
         return(list(
           error = paste0(" select_group '", nm, "' must contain at least one list"),
-          status = 1, nterm_data = NULL, df_design = NULL
+          status = 1, nterm_data = NULL, df_design = NULL, nterm_pep =NULL
         ))
       }
     
@@ -343,39 +368,67 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
             paste(invalid, collapse = ", "),
             "\nPossible values are: ", paste(valid_groups, collapse = ", ")
           ),
-          status = 1, nterm_data = NULL, df_design = NULL
+          status = 1, nterm_data = NULL, df_design = NULL, nterm_pep =NULL
         ))
       }
     }
     
     # add exp design to output
     
+    browser()
+
     df <- df %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
+    ## do the same in pep file 
+    
+    df_pep <- df_pep %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
+
+    checkedLength_pep  <- check_length_design_data (df_pep, design)
+ 
     # sanity check between data and exp design info 
-    checkedLength  <- check_length_design_data (df, design)
+    checkedLength_psm  <- check_length_design_data (df, design)
 
-    if (checkedLength$status==1){
-
-    return( list(error= checkedLength$error, status= checkedLength$status ,nterm_data =  NULL, df_design = NULL ))
+    # 3. Handle CRITICAL ERRORS (Status 1)
+    # If either file fails completely, return the error immediately
+    if (checkedLength_psm$status == 1 || checkedLength_pep$status == 1) {
+        # Determine which error to show (prioritize df, then pep)
+        err_msg <- if(checkedLength_psm$status == 1) checked_df$error else checkedLength_pep$error
+        
+        return(list(
+            error      = err_msg, 
+            status     = 1, 
+            nterm_data = NULL, 
+            df_design  = NULL, 
+            nterm_pep  = NULL
+        ))
     }
    
-    if (checkedLength$status==2){
-       df <- checkedLength$data_
-      log_info(checkedLength$message)
+        # If status is 2, the function usually returns a filtered version of the data
+    if (checkedLength_psm$status == 2) {
+        df <- checkedLength_psm$data_
+        log_info(paste("PSM:", checkedLength_psm$message))
+    }
+
+    if (checkedLength_pep$status == 2) {
+        df_pep <- checkedLength_pep$data_
+        log_info(paste("Peptide:", checkedLength_pep$message))
     }
 
     ## steps shared chen the data is ok. 
     df <- df %>%
       left_join(design %>%
                   select(Run, Group, Sample), join_by(Run))
-
+    
     df$Percent_Acetylation <- (df$L.H * 100) / (df$L.H + 1)
+    
+    #" other step for peptide file 
+    df_pep <- df_pep %>%
+      left_join(design %>%
+                  select(Run, Group, Sample), join_by(Run))
 
-
-    return( list(error= '', status= 0, nterm_data =  df, df_design = design ))
+    return( list(error= '', status= 0, nterm_data =  df, df_design = design , nterm_pep = df_pep))
   },error = function(err){
     print(paste("Reading Design / Nterm PSM  file :  ",err))
-    return( list(error= err, status= 1,  nterm_data =  NULL, df_design = NULL ))
+    return( list(error= err, status= 1,  nterm_data =  NULL , nterm_pep =  NULL , df_design = NULL, nterm_pep =NULL ))
 
   } )
 
@@ -580,8 +633,34 @@ process_filter_wip <- function(filter_item, filter_label, data, countpeptides , 
 
 
 
+
 #'@author Andrea Argentini
-#' @title  global_stat_general
+#' @title  global_PEP_general
+#'
+#' @description Place holder function for peptide quant processing. 
+
+#' @param d_nterm input n-terminal data frame
+#' @return res dataframe with all the computed metrics
+ #' @importFrom  logger log_info
+
+#'
+
+global_PEP_general  <- function(pep_nterm, design ) {
+
+  log_info('Global Statistics Start ...')
+
+  # ration acetilation 
+  
+   pep_nterm <- pep_nterm %>% mutate (Ace_ratio =  .[['L.H.HS']] * 100 / (.[['L.H.HS']] + 1)) 
+  ## here goes other transformation logic 
+  
+  return(list(error= '', status= 1,pep_nterm = pep_nterm) )
+}
+
+
+
+#'@author Andrea Argentini
+#' @title  global_PSM_general
 #'
 #' @description Global statistics computed for the entire dataset.Statistic and its labels are
 #' parameters at the moment.
@@ -591,7 +670,7 @@ process_filter_wip <- function(filter_item, filter_label, data, countpeptides , 
 
 #'
 
-global_stat_general  <- function(d_nterm, stat_reg, stat_name) {
+global_PSM_general  <- function(d_nterm, stat_reg, stat_name) {
 
   log_info('Global Statistics Start ...')
   #  sorted by num id 

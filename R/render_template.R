@@ -353,8 +353,13 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
                     )
     stat_name  <- c('Total PSM','Ace','Gln-NtermQ', 'Butyl','Cterminal', 'butylated_R','butylated_notR','H_cont '  )
      browser()
-    res_a <- global_stat_general( res$nterm_data, stat_reg, stat_name)
-   if (res_a$status == 1) stop(res_a$error)
+    res_a <- global_PSM_general( res$nterm_data, stat_reg, stat_name)
+     if (res_a$status == 1) stop(res_a$error)
+    browser()
+    res_bb <- global_PEP_general( res_a$nterm_pep, res_a$df_design )
+    if (res_bb$status == 1) stop(res_bb$error)
+
+    
   }
   browser()
   res_a <- global_stat( res$nterm_data)
