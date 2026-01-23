@@ -341,17 +341,14 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
     #                     expr(str_detect( pep_seq,'H'))
     #                    )
      #stat_name  <- c('Acetylation','Gln-NtermQ','Butylation','C-Terminal','Butylated_r', 'Butylated_nr','H PSMS')
-     stat_reg <- list( list(logic= expr(mascot_task == task[2]), calc_pct = TRUE),
-                      list(logic = expr( mascot_task == task[2] & grepl('*Acetyl (N-term)*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
-                      list(logic =  expr( mascot_task == task[2] & grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
-                      list( logic= expr( mascot_task == task[1] & grepl('*Butyl*', pep_var_mod, fixed = FALSE)),  calc_pct = FALSE) ,
+     stat_reg <- list(list(logic = expr(  grepl('N-term*', pep_var_mod, fixed = FALSE)),  calc_pct = FALSE ),
+                      list(logic = expr(  grepl('*Acetyl (N-term)*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
+                      list(logic =  expr( grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
                       list( logic = expr( mascot_task == task[2] & ! str_ends(pep_seq, "R")) , calc_pct = TRUE),
-                      list( logic = expr( mascot_task == task[1] & grepl('*Butyl*', pep_var_mod, fixed = FALSE) &  pep_res_before =="R" )  , calc_pct = FALSE),
-                      list( logic = expr( mascot_task == task[1] & grepl('*Butyl*', pep_var_mod, fixed = FALSE) &   !(pep_res_before == "R") ) , calc_pct = FALSE),
-                      list( logic = expr( str_detect( pep_seq,'H'))  , calc_pct = TRUE)
-
+                      list( logic = expr( mascot_task == task[1] &  str_detect( pep_seq,'H') )  , calc_pct = FALSE),
+                      list(logic= expr(mascot_task == task[2]), calc_pct = TRUE)
                     )
-    stat_name  <- c('Total PSM','Ace','Gln-NtermQ', 'Butyl','Cterminal', 'butylated_R','butylated_notR','H_cont '  )
+    stat_name  <- c('Nterminal','Ace','Gln-NtermQ', 'Cterminal', 'Nterm_Haa','NH2_start'  )
      browser()
     res_a <- global_PSM_general( res$nterm_data, stat_reg, stat_name)
      if (res_a$status == 1) stop(res_a$error)

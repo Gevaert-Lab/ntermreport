@@ -336,7 +336,6 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
           ))
 
     }
-
     df <-  read.delim(file_nterm, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
 
     df_pep <- read.delim(file_ntermpep, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
@@ -362,21 +361,12 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
     # Check that all values exist in design
       invalid <- setdiff(grp_set, valid_groups)
       if (length(invalid) > 0) {
-        return(list(
-          error = paste0(
-            "List  -> '", nm, "' of select_group contains invalid values: ",
-            paste(invalid, collapse = ", "),
-            "\nPossible values are: ", paste(valid_groups, collapse = ", ")
-          ),
-          status = 1, nterm_data = NULL, df_design = NULL, nterm_pep =NULL
-        ))
+        1
       }
     }
     
     # add exp design to output
     
-    browser()
-
     df <- df %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
     ## do the same in pep file 
     
@@ -638,6 +628,8 @@ process_filter_wip <- function(filter_item, filter_label, data, countpeptides , 
 #' @title  global_PEP_general
 #'
 #' @description Place holder function for peptide quant processing. 
+#' Numb identification 
+#' Acetilated % 
 
 #' @param d_nterm input n-terminal data frame
 #' @return res dataframe with all the computed metrics
@@ -686,7 +678,7 @@ global_PSM_general  <- function(d_nterm, stat_reg, stat_name) {
       process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm,countpeptides ,task  )
     })
     names(results_list) <- stat_name
-    browser()
+
 
     ## result
     res <- data.frame(
@@ -695,9 +687,45 @@ global_PSM_general  <- function(d_nterm, stat_reg, stat_name) {
       percentage = vapply(results_list, function(x) x$percentage_main, numeric(1))
     )
 
+
+    samples <- d_nterm %>% distinct(Sample) %>% pull()
+
+
+    results_sample_stat <- lapply(samples, function(sample_name) {
+        g_ <- d_nterm %>% filter(Sample == sample_name)
+        countpeptides <- nrow(g_)
+        log_info(paste0('Statistics for Sample : ',sample_name, ' -->  \n'))
+        results_list_ <- lapply(seq_along(stat_reg), function(i) {
+        process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm,countpeptides ,task  )
+            })
+        names(results_list_) <- stat_name
+
+        return(list(sample = sample_name, results = results_list_))
+      })
+     names(results_sample_stat) <- samples
+   browser()
+
+#     ## create a df
+
+     res_df_sample <- do.call(rbind, lapply(results_sample_stat, function(group_entry) {
+       sample_name <- group_entry$sample
+       results_ <- group_entry$results
+
+       data.frame(
+         sample = sample_name,
+         metric = names(results_),
+         count_absolute = sapply(results_, function(x) x$val_count),
+         percentage = sapply(results_, function(x) x$percentage_main),
+         stringsAsFactors = FALSE
+       )
+     }))
+#     rown
+
     rownames(res) <- NULL
+        rownames(res_df_sample) <- NULL
+
     log_info('Global Statistics End ...')
-    return( list(error= '', status= 0,  res = res ))
+    return( list(error= '', status= 0,  res = res , res_sample = res_df_sample))
     
   },error = function(err){
     print(paste("Global Stat :  ",err))
