@@ -606,18 +606,15 @@ sample_stat <- function(d_nterm) {
 #' @importFrom  logger log_info
 
 
-process_filter_wip <- function(filter_item, filter_label, data, countpeptides , task) {
+process_filter_wip <- function(filter_item, filter_label, data , task) {
     ## total
   
      print(filter_item$logic)
     val_count <-  data %>% filter(!! filter_item$logic)  %>% nrow()
-    percentage_main <- if(filter_item$calc_pct) (val_count / countpeptides) else NA
    
-  
     return(list(
       filter_name = filter_label,
-      val_count = val_count,
-      percentage_main = percentage_main
+      val_count = val_count
     ))
 }
 
@@ -641,12 +638,73 @@ global_PEP_general  <- function(pep_nterm, design ) {
 
   log_info('Global Statistics Start ...')
 
+  
+
+  # table logic    
+  df_count_run <- pep_nterm %>%
+  distinct(Sample, pep_seq, pep_exp_z) %>%
+  count(Sample, name = "n_precursors") %>%
+  arrange(Sample)
+  
+  df_count_group <- pep_nterm %>%
+  distinct(Group, pep_seq, pep_exp_z) %>%
+  count(Group, name = "n_precursors") %>%
+  arrange(Group)
+  
   # ration acetilation 
   
-   pep_nterm <- pep_nterm %>% mutate (Ace_ratio =  .[['L.H.HS']] * 100 / (.[['L.H.HS']] + 1)) 
+  # pep_nterm %>% filter(Nterm_mod.HS == "Acetyl")  %>%  filter (quant_valid.HS == TRUE ) %>%  
+  #   filter(pep_start %in% c(1, 2)) %>%  filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") 
+
+  all_ <- pep_nterm %>% filter(Nterm_mod.HS == "Acetyl")  %>%  filter (quant_valid.HS == TRUE ) %>%  
+    filter(pep_start %in% c(1, 2)) %>%  filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") %>% 
+    select(pep_modified_seq, Nterm_mod.HS, pep_start,pep_res_before,prot_acc, prot_desc,pep_seq ,Sample, Group) 
+
+  
+  ace_groups_pep <- split(all_, all_$Group)
+  ace_sample_pep <- split(all_, all_$Sample)
+
+
+
+  ## logic to make it for sample 
+
+#  tryCatch( expr = {
+#     samples <- design %>% distinct(Sample) %>% pull()
+
+#     all_results <- lapply(samples, function(sample_name) {
+#       g_ <- all_ %>% filter(Sample == sample_name)
+#         log_info(paste0('statistics for Sample : ',sample_name, ' -->  \n'))
+#       results_list <- lapply(seq_along(filter_), function(i) {
+#         process_filter(filter_[[i]], label_[i], g_, countpeptides)
+#       })
+#       names(results_list) <- label_
+
+#       return(list(sample = sample_name, results = results_list))
+#     })
+#     names(all_results) <- samples
+
+#     ## create a df
+
+#     res_df <- do.call(rbind, lapply(all_results, function(group_entry) {
+#       sample_name <- group_entry$sample
+#       results_list <- group_entry$results
+
+#       data.frame(
+#         sample = sample_name,
+#         metric = names(results_list),
+#         count_absolute = sapply(results_list, function(x) x$count_main),
+#         percentage = sapply(results_list, function(x) x$percentage_main),
+#         stringsAsFactors = FALSE
+#       )
+#     }))
+
+
+  #log_info('Using  Median.L.H for % Acetilation...')
+   #pep_nterm <- pep_nterm %>% mutate (Ace_ratio =  Median.L.H * 100 / ( Median.L.H + 1)) 
   ## here goes other transformation logic 
   
-  return(list(error= '', status= 1,pep_nterm = pep_nterm) )
+  return(list(error= '', status= 0,pep_cnt_sample = df_count_run  ,  pep_cnt_group = df_count_group, 
+                       ace_group =  ace_groups_pep ,  ace_sample =  ace_groups_pep ) )
 }
 
 
@@ -669,63 +727,94 @@ global_PSM_general  <- function(d_nterm, stat_reg, stat_name) {
   # task[1] KNfix
   # task[2] NH2
   task <- d_nterm %>% distinct(mascot_task) %>% pull() %>% as.integer() %>% sort() %>%   as.array()
-   
-  countpeptides <- nrow(d_nterm)
+  #browser()
+   ## compute the statistics 
+  summarize_peptide_stats <- function(counts_list) {
+  # 1. Convert list to vector
+  counts <- vapply(counts_list, function(x) x$val_count, numeric(1))
+  
+  # 2. Pre-calculate the denominator constant
+  # This avoids the "object not found" error later
+  total_val <- sum(counts[c('N-terminally', 'C-terminal', 'NH2')], na.rm = TRUE)
+  
+  # 3. Build the data frame
+  df <- data.frame(
+    label = names(counts_list),
+    count_absolute = counts,
+    stringsAsFactors = FALSE
+  ) %>%
+    # Add the custom enrichment calculation row
+    add_row(
+      label = "%.enrich.SCX.step", 
+      count_absolute = (counts['N-terminally'] + counts['C-terminal'] - counts['N-terminally with H'])
+    ) %>%
+    # Calculate percentages using the pre-calculated constant
+    mutate(
+      percentage = case_when(
+        total_val == 0 ~ 0,
+        label %in% c('N-terminally', 'C-terminal', 'N-terminally with H', 'NH2', '%.enrich.SCX.step') ~ (count_absolute / total_val) * 100,
+        TRUE ~ NA_real_
+      )
+    ) %>%
+    # Add the Total row at the very bottom using the constant
+    add_row(
+      label = "Total PSM", 
+      count_absolute = total_val,
+      percentage = 100.00
+    )     %>%
+    # Add the Total row at the very bottom using the constant
+    add_row(
+      label = "Nterminally Acetylated",
+      percentage = (counts['Ace'] / total_val) * 100
+    )
+    
+  return(df)
+
+}
+
+   log_info('Global Statistics Sample  ...')
 
   tryCatch( expr = {
 
-    results_list <- lapply(seq_along(stat_reg), function(i) {
-      process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm,countpeptides ,task  )
-    })
-    names(results_list) <- stat_name
+  results_list <- lapply(seq_along(stat_reg), function(i) {
+    process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm, task  )
+  })
+  names(results_list) <- stat_name
 
+  res <- summarize_peptide_stats(results_list)   
+    
+  samples <- d_nterm %>% distinct(Sample) %>% pull()
 
-    ## result
-    res <- data.frame(
-      label = names(results_list),
-      count_absolute = vapply(results_list, function(x) x$val_count, numeric(1)),
-      percentage = vapply(results_list, function(x) x$percentage_main, numeric(1))
-    )
+   results_sample_df <- lapply(samples, function(sample_name) {
+  
+  # 1. Filter data for this sample
+  sample_data <- d_nterm %>% filter(Sample == sample_name)
+  
+  # 2. Get raw counts using your existing logic
+  raw_counts <- lapply(seq_along(stat_reg), function(i) {
+    process_filter_wip(stat_reg[[i]], stat_name[i], sample_data, task)
+  })
+  names(raw_counts) <- stat_name
+  
+  # 3. Use the new function to get the final table for this sample
+  final_table <- summarize_peptide_stats(raw_counts)
+  
+  # Add a column so we know which sample this belongs to
+  final_table$sample <- sample_name
+  
+  return(final_table)
+})
+  
+res_df_sample <- do.call(rbind, results_sample_df)
+    
 
-
-    samples <- d_nterm %>% distinct(Sample) %>% pull()
-
-
-    results_sample_stat <- lapply(samples, function(sample_name) {
-        g_ <- d_nterm %>% filter(Sample == sample_name)
-        countpeptides <- nrow(g_)
-        log_info(paste0('Statistics for Sample : ',sample_name, ' -->  \n'))
-        results_list_ <- lapply(seq_along(stat_reg), function(i) {
-        process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm,countpeptides ,task  )
-            })
-        names(results_list_) <- stat_name
-
-        return(list(sample = sample_name, results = results_list_))
-      })
-     names(results_sample_stat) <- samples
-   browser()
-
-#     ## create a df
-
-     res_df_sample <- do.call(rbind, lapply(results_sample_stat, function(group_entry) {
-       sample_name <- group_entry$sample
-       results_ <- group_entry$results
-
-       data.frame(
-         sample = sample_name,
-         metric = names(results_),
-         count_absolute = sapply(results_, function(x) x$val_count),
-         percentage = sapply(results_, function(x) x$percentage_main),
-         stringsAsFactors = FALSE
-       )
-     }))
-#     rown
 
     rownames(res) <- NULL
         rownames(res_df_sample) <- NULL
 
     log_info('Global Statistics End ...')
-    return( list(error= '', status= 0,  res = res , res_sample = res_df_sample))
+    return( list(error= '', status= 0,  res = res ,
+                           res_sample = res_df_sample))
     
   },error = function(err){
     print(paste("Global Stat :  ",err))

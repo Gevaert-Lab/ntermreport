@@ -331,58 +331,49 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   if (res$status == 1) stop(res$error)
   ## get global statistics
 
-  if (template == 'Dev'){
-    #  stat_reg <- list('*Acetyl (N-term)*',
-    #                     '*Gln (N-term)',
-    #                     '*Butyl (N-term)*',
-    #                     list('*R$','*Butyl*'),
-    #                     expr(str_ends(pep_res_before, "R") & grepl('*Butyl*', pep_var_mod, fixed = FALSE)),
-    #                     expr(! str_ends(pep_res_before, "R") &  grepl('*Butyl*', pep_var_mod, fixed = FALSE)),
-    #                     expr(str_detect( pep_seq,'H'))
-    #                    )
-     #stat_name  <- c('Acetylation','Gln-NtermQ','Butylation','C-Terminal','Butylated_r', 'Butylated_nr','H PSMS')
-     stat_reg <- list(list(logic = expr(  grepl('N-term*', pep_var_mod, fixed = FALSE)),  calc_pct = FALSE ),
-                      list(logic = expr(  grepl('*Acetyl (N-term)*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
+  if (template == 'DEV_DDA.qmd'){
+
+     stat_reg <- list(list(logic = expr(  grepl('N-term*', pep_var_mod, fixed = FALSE)),  calc_pct = TRUE ),
+                      list(logic = expr(  grepl('*Ace*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
                       list(logic =  expr( grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
                       list( logic = expr( mascot_task == task[2] & ! str_ends(pep_seq, "R")) , calc_pct = TRUE),
-                      list( logic = expr( mascot_task == task[1] &  str_detect( pep_seq,'H') )  , calc_pct = FALSE),
+                      list( logic = expr( mascot_task == task[1] &  str_detect( pep_seq,'H') )  , calc_pct = TRUE),
                       list(logic= expr(mascot_task == task[2]), calc_pct = TRUE)
                     )
-    stat_name  <- c('Nterminal','Ace','Gln-NtermQ', 'Cterminal', 'Nterm_Haa','NH2_start'  )
-     browser()
+    stat_name  <- c('N-terminally','Ace','Gln-NtermQ', 'C-terminal', 'N-terminally with H','NH2'  )
     res_a <- global_PSM_general( res$nterm_data, stat_reg, stat_name)
-     if (res_a$status == 1) stop(res_a$error)
-    browser()
-    res_bb <- global_PEP_general( res_a$nterm_pep, res_a$df_design )
+    if (res_a$status == 1) stop(res_a$error)
+    
+    res_bb <- global_PEP_general( res$nterm_pep, res$df_design )
     if (res_bb$status == 1) stop(res_bb$error)
 
     
   }
-  browser()
-  res_a <- global_stat( res$nterm_data)
-  if (res_a$status == 1) stop(res_a$error)
-  ## group stats
-  res_b <- group_stat( res$nterm_data)
-  if (res_b$status == 1) stop(res_b$error)
+  ## prev. version
+  # res_a <- global_stat( res$nterm_data)
+  # if (res_a$status == 1) stop(res_a$error)
+  # ## group stats
+  # res_b <- group_stat( res$nterm_data)
+  # if (res_b$status == 1) stop(res_b$error)
 
-  res_c <- sample_stat( res$nterm_data)
-  if (res_c$status == 1) stop(res_c$error)
+  # res_c <- sample_stat( res$nterm_data)
+  # if (res_c$status == 1) stop(res_c$error)
 
-  res_acetyl <- acetyl_stat_( res$nterm_data)
-  if (res_acetyl$status == 1) stop(res_acetyl$error)
+  # res_acetyl <- acetyl_stat_( res$nterm_data)
+  # if (res_acetyl$status == 1) stop(res_acetyl$error)
 
-  res_acd4  <- acd4_stat_( res$nterm_data)
-  if (res_acd4$status == 1) stop(res_acd4$error)
+  # res_acd4  <- acd4_stat_( res$nterm_data)
+  # if (res_acd4$status == 1) stop(res_acd4$error)
 
-  res_base <- quant_base_(res$nterm_data)
-  if (res_base$status == 1) stop(res_base$error)
+  # res_base <- quant_base_(res$nterm_data)
+  # if (res_base$status == 1) stop(res_base$error)
 
-  list_group <- res$df_design %>% dplyr::distinct(Group) %>% pull()
-  res_write <- write_final_result(acetyl = res_acetyl$res, acd4 = res_acd4$res,
-                      quant_base = res_base$res,
-                      group_l = list_group,
-                      path =  report_folder )
-  if (res_write$status == 1) stop(res_write$error)
+  # list_group <- res$df_design %>% dplyr::distinct(Group) %>% pull()
+  # res_write <- write_final_result(acetyl = res_acetyl$res, acd4 = res_acd4$res,
+  #                     quant_base = res_base$res,
+  #                     group_l = list_group,
+  #                     path =  report_folder )
+  # if (res_write$status == 1) stop(res_write$error)
 
   log_info ('End processing  ...')
   log_info ('Starting Visualization  ...')
@@ -407,23 +398,37 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
     stop("Failed to copy the template folder to the temporary directory.")
   }
   log_info('Copy Template file ...done')
+  ## new template dev 
   saveRDS(res_a$res, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat.RDS'  ))
-  saveRDS(res_b$res, file.path(temp_work_dir,basename(template_source_folder), 'group_stat.RDS'  ))
-  saveRDS(res_c$res, file.path(temp_work_dir,basename(template_source_folder), 'sample_stat.RDS'  ))
-  saveRDS(res_acetyl$res, file.path(temp_work_dir,basename(template_source_folder), 'acetyl_stat.RDS'  ))
-  saveRDS(res_acd4$res, file.path(temp_work_dir,basename(template_source_folder), 'acd4_stat.RDS'  ))
-  ## unique protein export
+  saveRDS(res_a$res_sample, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat_sample.RDS'  ))
+ 
+  saveRDS(res_bb$pep_cnt_sample, file.path(temp_work_dir,basename(template_source_folder), 'pep_id.RDS'  ))
+    saveRDS(res_bb$pep_cnt_group, file.path(temp_work_dir,basename(template_source_folder), 'pep_id_sample.RDS'  ))
 
-  saveRDS(res_b$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_group.RDS'  ))
-  saveRDS(res_c$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_sample.RDS'  ))
 
-  params_report$glb_stat <-   file.path(temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
-  params_report$grp_stat<-   file.path(temp_work_dir,basename(template_source_folder),'group_stat.RDS'  )
-  params_report$sample_stat <-   file.path(temp_work_dir,basename(template_source_folder),'sample_stat.RDS' )
-  params_report$grp_uniqprot <-   file.path(temp_work_dir,basename(template_source_folder),'l_uniqueprot_group.RDS'  )
-  params_report$sample_uniqprot<-   file.path(temp_work_dir,basename(template_source_folder),'l_uniqueprot_sample.RDS'  )
-  params_report$acetyl_stat <-   file.path(temp_work_dir,basename(template_source_folder),'acetyl_stat.RDS'  )
-  params_report$acd4_stat <-   file.path(temp_work_dir,basename(template_source_folder),'acd4_stat.RDS'  )
+  params_report$glb_stat <-   file.path( temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
+  params_report$grp_stat <-   file.path( temp_work_dir,basename(template_source_folder),'glob_stat_sample.RDS'  )
+
+ params_report$pep_id <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id.RDS'  )
+  params_report$pep_id_sample <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id_sample.RDS'  )
+
+  # saveRDS(res_a$res, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat.RDS'  ))
+  # saveRDS(res_b$res, file.path(temp_work_dir,basename(template_source_folder), 'group_stat.RDS'  ))
+  # saveRDS(res_c$res, file.path(temp_work_dir,basename(template_source_folder), 'sample_stat.RDS'  ))
+  # saveRDS(res_acetyl$res, file.path(temp_work_dir,basename(template_source_folder), 'acetyl_stat.RDS'  ))
+  # saveRDS(res_acd4$res, file.path(temp_work_dir,basename(template_source_folder), 'acd4_stat.RDS'  ))
+  # ## unique protein export
+
+  # saveRDS(res_b$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_group.RDS'  ))
+  # saveRDS(res_c$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_sample.RDS'  ))
+
+  # params_report$glb_stat <-   file.path(temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
+  # params_report$grp_stat<-   file.path(temp_work_dir,basename(template_source_folder),'group_stat.RDS'  )
+  # params_report$sample_stat <-   file.path(temp_work_dir,basename(template_source_folder),'sample_stat.RDS' )
+  # params_report$grp_uniqprot <-   file.path(temp_work_dir,basename(template_source_folder),'l_uniqueprot_group.RDS'  )
+  # params_report$sample_uniqprot<-   file.path(temp_work_dir,basename(template_source_folder),'l_uniqueprot_sample.RDS'  )
+  # params_report$acetyl_stat <-   file.path(temp_work_dir,basename(template_source_folder),'acetyl_stat.RDS'  )
+  # params_report$acd4_stat <-   file.path(temp_work_dir,basename(template_source_folder),'acd4_stat.RDS'  )
 
   log_info('Copy Rds Results ...done')
 

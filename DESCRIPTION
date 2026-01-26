@@ -18,6 +18,7 @@ Imports:
     yaml,
     assertthat,
     dplyr,
+    rlang,
     utils,
     logger,
     magrittr, 
