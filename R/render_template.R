@@ -346,8 +346,6 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
     
     res_bb <- global_PEP_general( res$nterm_pep, res$df_design )
     if (res_bb$status == 1) stop(res_bb$error)
-
-    
   }
   ## prev. version
   # res_a <- global_stat( res$nterm_data)
@@ -403,14 +401,18 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   saveRDS(res_a$res_sample, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat_sample.RDS'  ))
  
   saveRDS(res_bb$pep_cnt_sample, file.path(temp_work_dir,basename(template_source_folder), 'pep_id.RDS'  ))
-    saveRDS(res_bb$pep_cnt_group, file.path(temp_work_dir,basename(template_source_folder), 'pep_id_sample.RDS'  ))
+  saveRDS(res_bb$pep_cnt_group, file.path(temp_work_dir,basename(template_source_folder), 'pep_id_grp.RDS'  ))
+  saveRDS(res_bb$ace_group, file.path(temp_work_dir,basename(template_source_folder), 'pep_ace_grp.RDS'  ))
+  saveRDS(res_bb$ace_sample, file.path(temp_work_dir,basename(template_source_folder), 'pep_ace.RDS'  ))
 
 
   params_report$glb_stat <-   file.path( temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
   params_report$grp_stat <-   file.path( temp_work_dir,basename(template_source_folder),'glob_stat_sample.RDS'  )
 
- params_report$pep_id <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id.RDS'  )
-  params_report$pep_id_sample <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id_sample.RDS'  )
+  params_report$pep_id <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id.RDS'  )
+  params_report$pep_id_group <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id_grp.RDS'  )
+  params_report$ace_group <-  file.path( temp_work_dir,basename(template_source_folder),'pep_ace_grp.RDS'  )
+  params_report$ace_ <-  file.path( temp_work_dir,basename(template_source_folder),'pep_ace.RDS'  )
 
   # saveRDS(res_a$res, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat.RDS'  ))
   # saveRDS(res_b$res, file.path(temp_work_dir,basename(template_source_folder), 'group_stat.RDS'  ))

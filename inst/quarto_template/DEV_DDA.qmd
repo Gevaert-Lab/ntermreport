@@ -10,6 +10,7 @@ format:
     toc-title: 'N-term Report'
     title-block-banner: '#1b2944'
     title-block-banner-color: '#f79646'
+    lightbox: auto
 
 execute: 
   echo: false
@@ -32,8 +33,10 @@ params:
   grp_stat: ""
   glb_stat: ""
   pep_id: ""
-  pep_id_sample: ""
-
+  pep_id_group: ""
+  ace_group: ""
+  ace_: ""
+ 
 
 ---
 
@@ -134,13 +137,17 @@ document.addEventListener('DOMContentLoaded', function() {
 ```{r import_data}
 
 L <- readLines(params$design_file, n = 1)
-    if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else design <- read.csv(params$design_file)
+    if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else expdesign <- read.csv(params$design_file)
 
 glb_df  <-  readRDS(params$glb_stat )
 grp_df <-  readRDS(params$grp_stat )
 
 pepid_df  <-  readRDS(params$pep_id )
-pepidsample_df <-  readRDS(params$pep_id_sample )
+pepidgrp_df <-  readRDS(params$pep_id_group )
+
+l_ace_grp <-  readRDS(params$ace_group )
+l_ace_ <-  readRDS(params$ace_ )
+
 
 
 ```
@@ -169,12 +176,42 @@ theme_custom_vis <- function(base_size = 12) {
 }
 
 theme_set(theme_custom_vis(base_size = 18))
+
 if (all(params$select_group != '')) {
   log_info(paste0('Selected groups: ',paste(params$select_group,collapse = ' '  )))
   selec_group_l <-  params$select_group
 
   all_group_ <- unique(expdesign$Group)
   }
+
+
+## reactable theme 
+
+lab_report_theme <- reactableTheme(
+  color = "#2c3e50",
+  backgroundColor = "#ffffff",
+  borderColor = "#dfe2e5",
+  borderWidth = "1px",
+  
+  # Styling the Header
+  headerStyle = list(
+    backgroundColor = "#f8f9fa",
+    color = "#34495e",
+    fontWeight = "700",
+    borderBottom = "2px solid #3498db" # Adds a nice blue accent line
+  ),
+  
+  # Styling the Table Body
+  rowStyle = list(
+    fontSize = "18px"
+  ),
+  
+  # Styling the Search Box (if you use search = TRUE)
+  searchInputStyle = list(
+    width = "100%",
+    backgroundColor = "#fdfdfd"
+  )
+)
 
 
 ```
@@ -240,7 +277,8 @@ reactable(
       name = "Percentage",
       format = colFormat(digits = 2, suffix = "%")
     )
-  )
+  ),
+  theme = lab_report_theme
 )
 ```
 
@@ -252,6 +290,63 @@ reactable(
 grp_df <- grp_df %>%  arrange(sample)
 
 
+nACe_pec <-  grp_df %>% filter(label == 'Nterminally Acetylated') %>% arrange(sample)
+
+summary_stats <- nACe_pec %>%
+  summarise(
+    Metric = "N-terminally Acetylated (%)",
+    n_samples = n(),
+    Mean = mean(percentage, na.rm = TRUE),
+    SD = sd(percentage, na.rm = TRUE),
+    CV_percent = (SD / Mean) * 100  # Coefficient of Variation is often useful in PTM analysis
+  )
+ace_mean <- mean(nACe_pec$percentage, na.rm = TRUE)
+ace_sd <- sd(nACe_pec$percentage, na.rm = TRUE)
+
+Nter_ace_perc_plot <-   ggplot ( nACe_pec, aes(x = factor(sample, levels = sample), y = percentage)) +
+  geom_col(fill = "steelblue") +
+  # Add the mean line
+  geom_hline(yintercept = ace_mean, linetype = "dashed", color = "red", size = 1) +
+  # Add a label for the mean
+  annotate("text", x = -Inf, y = ace_mean + 1, label = paste("Mean:", round(ace_mean, 2)), color = "red", hjust = - 0.1) +
+  scale_x_discrete(drop = FALSE) +
+  labs(x = "Sample", y = "% Nterminally Acetylated", title = "Nterminally Acetylated") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+Nter_ace_perc_plot
+
+##
+reactable(
+  summary_stats,
+  columns = list(
+    Metric = colDef(name = "Analysis Target", minWidth = 200, style = list(fontWeight = "bold")),
+    n_samples = colDef(name = "Sample Count", align = "center"),
+    Mean = colDef(
+      name = "Average (%)",
+      format = colFormat(digits = 2, suffix = "%"),
+      style = list(background = "#f0f9ff", fontWeight = "bold")
+    ),
+    SD = colDef(
+      name = "Std. Deviation",
+      format = colFormat(digits = 2)
+    ),
+    CV_percent = colDef(
+      # We replace 'name' and 'helpText' with a custom header function
+      header = function(value) {
+        tags$span(title = "Coefficient of Variation (SD/Mean)", "CV (%)")
+      },
+      format = colFormat(digits = 1, suffix = "%")
+    )
+  ),
+  bordered = TRUE,
+  highlight = TRUE,
+  theme = lab_report_theme
+
+)
+
+
+
+## here should do the mean visualization 
 
  reactable(grp_df, groupBy= 'sample' ,  
  pagination = FALSE,
@@ -291,27 +386,82 @@ grp_df <- grp_df %>%  arrange(sample)
       name = "Percentage",
       format = colFormat(digits = 2, suffix = "%")
     )
-  )
+  ),
+  theme = lab_report_theme
+
 )
  
 ```
 
 
-# precursor / peptide Identification 
+# Quantitative QC 
 
 
 Here goes other text.  (From Peptide file )
 
 ```{r idplot}
+#| layout-ncol: 2
+#| fig-cap: 
+#|   - "Quantified precursor for all the samples"
+#|   - "Quantified precursor aggregated per groups"
 
 fig.prec <-
   ggplot (pepid_df, aes(x = factor(Sample, levels = Sample), y = n_precursors)) +
-  geom_col () +
+  geom_col (fill = "steelblue") +
   scale_x_discrete(drop = FALSE) +
   labs(x = "Sample", y = "Number of unique precursors", title = "Unique precursors") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
-print(fig.prec)
+fig.prec
+
+
+
+
+fig.grp <-
+  ggplot (pepidgrp_df, aes(x = factor(Group, levels = Group), y = n_precursors)) +
+  geom_col (fill = "steelblue") +
+  scale_x_discrete(drop = FALSE) +
+  labs(x = "Group", y = "Number of unique precursors", title = "Unique precursors") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fig.grp
+
+```
+
+## Upset related on the Acetylated precursor
+
+*To be checked !!*
+I use all the precursor (from PEPTIDE file) with: 
+
+- *Nterm_mod.HS == "Acetyl* and *quant_valid.HS == TRUE*
+
+- *pep_start is 1|2* and (*peptide sequence start with an M* or *pep_res_before == M*)
+
+for every group I can make an upset plot, containing the replicates. See below.
+
+```{r upset_peptide}
+
+#pepidsample_df
+
+grp_value  <- expdesign %>% distinct(Group) %>% pull()
+my_list <- list()
+
+for ( g_ in grp_value) {
+      my_list[[g_]] <- l_ace_grp[[g_]]$pep_seq
+}
+upsetjs() %>%  fromList(my_list )  %>% generateDistinctIntersections()
+
+
+sample_grp  <- expdesign %>% filter( Group == 'NAA25KO') %>% pull(Sample)
+my_list_ <- list()
+
+for ( g_ in sample_grp) {
+      my_list_[[g_]] <- l_ace_[[g_]]$pep_seq
+}
+upsetjs() %>%  fromList(my_list_ )  %>% generateDistinctIntersections()
+
 
 
 ```
+
+

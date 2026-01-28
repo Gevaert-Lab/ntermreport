@@ -663,9 +663,7 @@ global_PEP_general  <- function(pep_nterm, design ) {
   
   ace_groups_pep <- split(all_, all_$Group)
   ace_sample_pep <- split(all_, all_$Sample)
-
-
-
+  
   ## logic to make it for sample 
 
 #  tryCatch( expr = {
@@ -704,7 +702,7 @@ global_PEP_general  <- function(pep_nterm, design ) {
   ## here goes other transformation logic 
   
   return(list(error= '', status= 0,pep_cnt_sample = df_count_run  ,  pep_cnt_group = df_count_group, 
-                       ace_group =  ace_groups_pep ,  ace_sample =  ace_groups_pep ) )
+                       ace_group =  ace_groups_pep ,  ace_sample =  ace_sample_pep ) )
 }
 
 
@@ -808,7 +806,6 @@ global_PSM_general  <- function(d_nterm, stat_reg, stat_name) {
 res_df_sample <- do.call(rbind, results_sample_df)
     
 
-
     rownames(res) <- NULL
         rownames(res_df_sample) <- NULL
 
@@ -818,7 +815,7 @@ res_df_sample <- do.call(rbind, results_sample_df)
     
   },error = function(err){
     print(paste("Global Stat :  ",err))
-    return( list(error= err, status= 1,res =NULL ))
+    return( list(error= err, status= 1,res =NULL,res_sample=NULL  ))
   })
 }
 
