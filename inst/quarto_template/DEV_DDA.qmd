@@ -409,7 +409,7 @@ fig.prec <-
   ggplot (pepid_df, aes(x = factor(Sample, levels = Sample), y = n_precursors)) +
   geom_col (fill = "steelblue") +
   scale_x_discrete(drop = FALSE) +
-  labs(x = "Sample", y = "Number of unique precursors", title = "Unique precursors") +
+  labs(x = "Sample", y = "Number of modified peptides", title = "Unique modified peptides") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 fig.prec
@@ -421,47 +421,130 @@ fig.grp <-
   ggplot (pepidgrp_df, aes(x = factor(Group, levels = Group), y = n_precursors)) +
   geom_col (fill = "steelblue") +
   scale_x_discrete(drop = FALSE) +
-  labs(x = "Group", y = "Number of unique precursors", title = "Unique precursors") +
+  labs(x = "Group", y = "Number of modified peptides", title = "Unique modified peptides") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 fig.grp
 
 ```
 
-## Upset related on the Acetylated precursor
+
+#  Overlapping Acetylated Peptide Across Groups
+
 
 *To be checked !!*
 I use all the precursor (from PEPTIDE file) with: 
 
 - *Nterm_mod.HS == "Acetyl* and *quant_valid.HS == TRUE*
 
-- *pep_start is 1|2* and (*peptide sequence start with an M* or *pep_res_before == M*)
+- *pep_start is 1|2*.
 
 for every group I can make an upset plot, containing the replicates. See below.
 
 ```{r upset_peptide}
+#| results: asis
 
 #pepidsample_df
 
 grp_value  <- expdesign %>% distinct(Group) %>% pull()
 my_list <- list()
-
+my_peptide_info <- list()
 for ( g_ in grp_value) {
       my_list[[g_]] <- l_ace_grp[[g_]]$pep_seq
+            my_peptide_info[[g_]] <-  l_ace_grp[[g_]] %>% select(prot_acc,pep_seq,prot_desc)
+
 }
-upsetjs() %>%  fromList(my_list )  %>% generateDistinctIntersections()
 
+ann_df <- bind_rows(my_peptide_info) %>% distinct(prot_acc, pep_seq,prot_desc)
 
-sample_grp  <- expdesign %>% filter( Group == 'NAA25KO') %>% pull(Sample)
-my_list_ <- list()
+ntermreport::render_child(data = my_list ,
+              label = g_ , 
+              path= "",  
+              template='_template_upsetDIAG.Rmd') 
 
-for ( g_ in sample_grp) {
-      my_list_[[g_]] <- l_ace_[[g_]]$pep_seq
-}
-upsetjs() %>%  fromList(my_list_ )  %>% generateDistinctIntersections()
+#upsetjs() %>%  fromList(my_list )  %>% generateDistinctIntersections()
 
+all_elements <- unique(unlist(my_list)) 
+all_elements <- all_elements[!is.na(all_elements)]
+# Build logical membership table
+intersection_ <- data.frame(
+  Elements = all_elements,
+  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+)
+
+all_intersections_ <- ntermreport::get_all_intersections(intersection_)
+
+all_intersections_filt <- all_intersections_[sapply(all_intersections_, function(x) x$count > 50)]
+
+cat('<div class="accordion" id="intersection-accordion">')
+
+# Sort intersections by count (descending)
+sorted_names <- names(all_intersections_filt)[order(
+  sapply(all_intersections_filt, function(x) x$count),
+  decreasing = TRUE
+)]
+
+  # Generate individual sections for each intersection
+for (name in sorted_names) {
+  data <- all_intersections_filt[[name]]
+        
+  prot_map <- ann_df %>%
+  filter(pep_seq %in% data$elements) %>%
+    group_by(pep_seq) %>%
+    summarise(proteins = list(prot_acc),  protein_description = list(prot_desc),.groups = "drop")
+
+    lista_final <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =   prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  pull(protein_ids),
+      protein_description =   prot_map %>%    
+                  mutate(protein_description = sapply(protein_description, paste, collapse = "; ")) %>%
+                  pull(protein_description) ,
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    log_info(name)
+    log_info(length(lista_final$proteins))
+    log_info(length(lista_final$protein_description))
+    log_info(length(lista_final$elements))
+    
+    ntermreport::render_child(data = lista_final ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+    cat('</div>') 
 
 
 ```
 
+#  Overlapping Acetylated Peptide Within Groups
 
+::: panel-tabset
+```{r  perGroup}
+#| results: asis
+
+#grp_value
+
+for (grp in grp_value){ 
+
+  sample_grp  <- expdesign %>% filter( Group == grp ) %>% pull(Sample)
+  cat( '## ', paste(grp,sep=' '), '\n\n')
+  log_info(paste('inside -  perGroup ',grp,collapse= '\n'))
+  my_list_ <- list()
+  for ( g_ in sample_grp) {
+        my_list_[[g_]] <- l_ace_[[g_]]$pep_seq
+   }
+
+  p <- upsetjs() %>%  fromList(my_list_ )  %>% generateDistinctIntersections()
+  print(htmltools::tagList(p))
+  cat('\n\n') # Add space before the next tab
+
+}
+
+
+```
+
+:::

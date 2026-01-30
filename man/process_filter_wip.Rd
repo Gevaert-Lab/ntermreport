@@ -4,23 +4,28 @@
 \alias{process_filter_wip}
 \title{process_filter_wip}
 \usage{
-process_filter_wip(filter_item, filter_label, data, countpeptides, task)
+process_filter_wip(filter_item, filter_label, data, task)
 }
 \arguments{
-\item{filter_label}{label of the filter / metrics}
+\item{filter_item}{A list containing the filtering logic (e.g., `filter_item$logic`).}
 
-\item{data}{inpute dataframe to filter}
+\item{filter_label}{A character string used as a label for the specific metric.}
 
-\item{countpeptides}{denominator cardinality of the input dataframe}
+\item{data}{The input data frame to be filtered.}
 
-\item{filter_pattern}{reg exp to filter}
+\item{task}{An array or vector of mascot tasks used for context (if applicable within the logic).}
 }
 \value{
-list with computed metrics
+A list containing:
+\itemize{
+  \item{filter_name}{ The provided `filter_label`.}
+  \item{val_count}{ The number of rows (integer) after applying the filter.}
+}
 }
 \description{
-This function apply the right filtering and computed the metrics related,
-bot as absolute and percentage values.
+Applies a specific filtering logic to the input data frame and computes 
+the absolute count of the remaining rows. This function supports 
+tidy evaluation for dynamic filtering.
 }
 \author{
 Andrea Argentini

@@ -57,7 +57,7 @@ validate_folder <- function(report_folder) {
 #' @importFrom assertthat assert_that is.string
 validate_template <- function(template) {
   # Define the list of valid templates
-  valid_templates <- c( "Template_DDA.qmd")
+  valid_templates <- c( "Template_DDA.qmd","DEV_DDA.qmd")
 
   # Check if template is a string
   assertthat::assert_that(assertthat::is.string(template), msg = "template must be a string.")
@@ -295,7 +295,9 @@ merge_default_parameters <- function  ( params_int  ){
 #' @importFrom fs file_move
 #' @importFrom logger log_info log_threshold log_appender log_formatter INFO appender_console appender_file
 #' @importFrom yaml as.yaml
+#' @importFrom rlang expr
 #' @importFrom utils modifyList
+#' @importFrom stringr str_ends str_detect
 #' @importFrom assertthat assert_that is.string
 #' @export
 render_nterm_report <- function(params_report, template, report_folder, report_filename ) {
@@ -331,23 +333,21 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   if (res$status == 1) stop(res$error)
   ## get global statistics
 
-  if (template == 'DEV_DDA.qmd'){
+  stat_reg <- list(list(logic = expr(  grepl('N-term*', pep_var_mod, fixed = FALSE)),  calc_pct = TRUE ),
+                  list(logic = expr(  grepl('*Ace*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
+                  list(logic =  expr( grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
+                  list( logic = expr( mascot_task == task[2] & ! str_ends(pep_seq, "R")) , calc_pct = TRUE),
+                  list( logic = expr( mascot_task == task[1] &  str_detect( pep_seq,'H') )  , calc_pct = TRUE),
+                  list(logic= expr(mascot_task == task[2]), calc_pct = TRUE)
+                )
+  stat_name  <- c('N-terminally','Ace','Gln-NtermQ', 'C-terminal', 'N-terminally with H','NH2'  )
+  res_a <- global_PSM_general( res$nterm_data, stat_reg, stat_name)
+  if (res_a$status == 1) stop(res_a$error)
 
-     stat_reg <- list(list(logic = expr(  grepl('N-term*', pep_var_mod, fixed = FALSE)),  calc_pct = TRUE ),
-                      list(logic = expr(  grepl('*Ace*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
-                      list(logic =  expr( grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
-                      list( logic = expr( mascot_task == task[2] & ! str_ends(pep_seq, "R")) , calc_pct = TRUE),
-                      list( logic = expr( mascot_task == task[1] &  str_detect( pep_seq,'H') )  , calc_pct = TRUE),
-                      list(logic= expr(mascot_task == task[2]), calc_pct = TRUE)
-                    )
-    stat_name  <- c('N-terminally','Ace','Gln-NtermQ', 'C-terminal', 'N-terminally with H','NH2'  )
-    res_a <- global_PSM_general( res$nterm_data, stat_reg, stat_name)
-    if (res_a$status == 1) stop(res_a$error)
-    
-    res_bb <- global_PEP_general( res$nterm_pep, res$df_design )
-    if (res_bb$status == 1) stop(res_bb$error)
-  }
-  ## prev. version
+  res_bb <- global_PEP_general( res$nterm_pep, res$df_design )
+  if (res_bb$status == 1) stop(res_bb$error)
+  
+  ## prev. version keep for legacy now 
   # res_a <- global_stat( res$nterm_data)
   # if (res_a$status == 1) stop(res_a$error)
   # ## group stats
@@ -414,23 +414,7 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   params_report$ace_group <-  file.path( temp_work_dir,basename(template_source_folder),'pep_ace_grp.RDS'  )
   params_report$ace_ <-  file.path( temp_work_dir,basename(template_source_folder),'pep_ace.RDS'  )
 
-  # saveRDS(res_a$res, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat.RDS'  ))
-  # saveRDS(res_b$res, file.path(temp_work_dir,basename(template_source_folder), 'group_stat.RDS'  ))
-  # saveRDS(res_c$res, file.path(temp_work_dir,basename(template_source_folder), 'sample_stat.RDS'  ))
-  # saveRDS(res_acetyl$res, file.path(temp_work_dir,basename(template_source_folder), 'acetyl_stat.RDS'  ))
-  # saveRDS(res_acd4$res, file.path(temp_work_dir,basename(template_source_folder), 'acd4_stat.RDS'  ))
-  # ## unique protein export
 
-  # saveRDS(res_b$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_group.RDS'  ))
-  # saveRDS(res_c$l_uniq_protein, file.path(temp_work_dir,basename(template_source_folder), 'l_uniqueprot_sample.RDS'  ))
-
-  # params_report$glb_stat <-   file.path(temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
-  # params_report$grp_stat<-   file.path(temp_work_dir,basename(template_source_folder),'group_stat.RDS'  )
-  # params_report$sample_stat <-   file.path(temp_work_dir,basename(template_source_folder),'sample_stat.RDS' )
-  # params_report$grp_uniqprot <-   file.path(temp_work_dir,basename(template_source_folder),'l_uniqueprot_group.RDS'  )
-  # params_report$sample_uniqprot<-   file.path(temp_work_dir,basename(template_source_folder),'l_uniqueprot_sample.RDS'  )
-  # params_report$acetyl_stat <-   file.path(temp_work_dir,basename(template_source_folder),'acetyl_stat.RDS'  )
-  # params_report$acd4_stat <-   file.path(temp_work_dir,basename(template_source_folder),'acd4_stat.RDS'  )
 
   log_info('Copy Rds Results ...done')
 

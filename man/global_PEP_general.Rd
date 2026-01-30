@@ -7,15 +7,25 @@
 global_PEP_general(pep_nterm, design)
 }
 \arguments{
-\item{d_nterm}{input n-terminal data frame}
+\item{design}{dataframe realted to the design experiment}
+
+\item{d_nterm}{input n-terminal data frame parsed from peptide file}
 }
 \value{
-res dataframe with all the computed metrics
+A list containing:
+\itemize{
+  \item{error}{ Error message string.}
+  \item{status}{ Status code (0 for success).}
+  \item{pep_cnt_sample}{ Precursor counts per sample.}
+  \item{pep_cnt_group}{ Precursor counts per group.}
+  \item{ace_group}{ Acetylated peptides split by group.}
+  \item{ace_sample}{ Acetylated peptides split by sample.}
+}
 }
 \description{
-Place holder function for peptide quant processing. 
-Numb identification 
-Acetilated %
+Calculates the number of identified precursors per Sample and Group,
+and filters for N-terminally acetylated peptides based on specific 
+methionine (M) cleavage logic
 }
 \author{
 Andrea Argentini

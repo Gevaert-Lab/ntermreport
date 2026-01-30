@@ -14,25 +14,27 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Imports: 
-    fs,
-    yaml,
     assertthat,
-    dplyr,
-    rlang,
-    utils,
-    logger,
-    magrittr, 
-    quarto,
-    withr,
     BiocManager,
+    dplyr,
+    fs,
+    glue,
+    htmltools,    
+    logger,
+    magrittr,
+    openxlsx,
     purrr,
+    quarto,
+    reactable,     
+    rlang,
     tibble,
     tidyr,
+    utils,
     withr,
-    glue,
-    openxlsx,
+    yaml,
     diareport
 Suggests: 
     testthat (>= 3.0.0),
-    knitr
+    knitr,
+    tippy
 RoxygenNote: 7.3.2

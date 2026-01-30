@@ -7,14 +7,25 @@
 global_PSM_general(d_nterm, stat_reg, stat_name)
 }
 \arguments{
-\item{d_nterm}{input n-terminal data frame}
+\item{d_nterm}{A data frame containing PSM-level N-terminal data.}
+
+\item{stat_reg}{A list of regular expressions defining the modifications to search for.}
+
+\item{stat_name}{A character vector of names corresponding to the `stat_reg` patterns.}
 }
 \value{
-res dataframe with all the computed metrics
+A list containing:
+\itemize{
+  \item{error}{ Character string containing error messages, if any.}
+  \item{status}{ Integer status code (0 for success, 1 for error).}
+  \item{res}{ Dataframe of global summary statistics.}
+  \item{res_sample}{ Dataframe of summary statistics broken down by sample.}
+}
 }
 \description{
-Global statistics computed for the entire dataset.Statistic and its labels are
-parameters at the moment.
+Computes global PTM statistics from PSM data using a list of regular expressions. 
+Calculates specific proteomics metrics including SCX enrichment efficiency 
+and N-terminal acetylation percentages across the entire dataset and per sample.
 }
 \author{
 Andrea Argentini
