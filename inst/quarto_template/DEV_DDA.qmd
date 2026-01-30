@@ -1,0 +1,550 @@
+---
+title: "DEV REPORT `r params$title`"
+subtitle: "`r params$subtitle`"
+author: "`r params$author`"
+format: 
+  html:
+    fig-width: 12
+    fig-height: 10
+    toc: true
+    toc-title: 'N-term Report'
+    title-block-banner: '#1b2944'
+    title-block-banner-color: '#f79646'
+    lightbox: auto
+
+execute: 
+  echo: false
+  warning: false
+embed-resources: true
+theme: 
+ - layout/brand 
+ - layout/custom.scss
+
+params:
+  description: ""
+  design_file: ""
+  input_file: ""
+  folder_prj: ""
+  title: ""
+  subtitle: ""
+  author: "" 
+  select_group: ""
+  sample_stat: ""
+  grp_stat: ""
+  glb_stat: ""
+  pep_id: ""
+  pep_id_group: ""
+  ace_group: ""
+  ace_: ""
+ 
+
+---
+
+
+```{css css_set_up}
+/* Custom CSS for better visualization */
+.card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 0.75rem 1.25rem;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.badge {
+  font-size: 0.9em;
+  padding: 0.5em 1em;
+}
+
+.elements-table {
+  margin-top: 1rem;
+}
+
+.dataTables_wrapper {
+  padding: 10px;
+}
+.card-header {
+  transition: background-color 0.3s ease;
+}
+
+.card-header:hover {
+  background-color: #e9ecef;
+}
+
+.collapse-icon {
+  transition: transform 0.3s ease;
+}
+
+.card-header[aria-expanded="true"] .collapse-icon {
+  transform: rotate(180deg);
+}
+
+/* Animate collapse */
+.collapse {
+  transition: height 0.35s ease;
+}
+
+/* Optional: Style to show which card is active */
+.card-header[aria-expanded="true"] {
+  background-color: #e9ecef;
+  border-bottom: none;
+}
+
+/* Add spacing between header elements */
+.card-title {
+  margin-bottom: 0;
+}
+
+.card-subtitle {
+  margin-top: 0.5rem;
+}
+
+/* Ensure the chevron icon aligns properly */
+.fas {
+  width: 1em;
+  text-align: center;
+}
+```
+
+```{js js_set_up}
+// Add this JavaScript to handle the chevron rotation
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.card-header').forEach(header => {
+    header.addEventListener('click', function() {
+      const isExpanded = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', !isExpanded);
+    });
+  });
+  
+  // Show first card by default (optional)
+  const firstCard = document.querySelector('.collapse');
+  if (firstCard) {
+    new bootstrap.Collapse(firstCard, {
+      toggle: false
+    }).show();
+  }
+});
+```
+
+```{r import_data}
+
+L <- readLines(params$design_file, n = 1)
+    if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else expdesign <- read.csv(params$design_file)
+
+glb_df  <-  readRDS(params$glb_stat )
+grp_df <-  readRDS(params$grp_stat )
+
+pepid_df  <-  readRDS(params$pep_id )
+pepidgrp_df <-  readRDS(params$pep_id_group )
+
+l_ace_grp <-  readRDS(params$ace_group )
+l_ace_ <-  readRDS(params$ace_ )
+
+
+
+```
+
+```{r load_packg_set_up}
+#| output: false
+ required_packages = c("ggrepel","ggplot","reactable",
+                       "plotly","DT",'gridExtra','ggVennDiagram','dplyr' ,'logger','pander','yaml','upsetjs','htmltools','purrr')
+ ntermreport::check_dependencies(required_packages)
+
+ st=format(Sys.time(), "%Y%m%d_%H%M")
+write(as.yaml(params), file =  file.path( params$folder_prj, paste0("NtermDDA_parameter_",st  , ".yaml")))
+
+theme_custom_vis <- function(base_size = 12) {
+  theme_bw(base_size = base_size) %+replace%
+    theme(
+      # leggend
+      legend.title = element_text(size = rel(0.85), face = "bold"),
+      legend.text = element_text(size = rel(0.70), face = "bold"),
+      legend.key = element_rect(fill = "transparent", colour = NA),
+      legend.key.size = unit(1.5, "lines"),
+      legend.background = element_rect(fill = "transparent", colour = NA),
+      strip.background = element_rect(fill = "#bababa", color = "black"),
+      strip.text = element_text(size = rel(0.85), face = "bold", color = "#1b2944", margin = margin(5,0,5,0))
+    )
+}
+
+theme_set(theme_custom_vis(base_size = 18))
+
+if (all(params$select_group != '')) {
+  log_info(paste0('Selected groups: ',paste(params$select_group,collapse = ' '  )))
+  selec_group_l <-  params$select_group
+
+  all_group_ <- unique(expdesign$Group)
+  }
+
+
+## reactable theme 
+
+lab_report_theme <- reactableTheme(
+  color = "#2c3e50",
+  backgroundColor = "#ffffff",
+  borderColor = "#dfe2e5",
+  borderWidth = "1px",
+  
+  # Styling the Header
+  headerStyle = list(
+    backgroundColor = "#f8f9fa",
+    color = "#34495e",
+    fontWeight = "700",
+    borderBottom = "2px solid #3498db" # Adds a nice blue accent line
+  ),
+  
+  # Styling the Table Body
+  rowStyle = list(
+    fontSize = "18px"
+  ),
+  
+  # Styling the Search Box (if you use search = TRUE)
+  searchInputStyle = list(
+    width = "100%",
+    backgroundColor = "#fdfdfd"
+  )
+)
+
+
+```
+
+# Experiment Description
+
+`r params$description`
+
+#  General PSMs Count
+ 
+```{r general_viz}
+
+#  reactable(glb_df,  columns = list(
+#    percentage = colDef(format = colFormat(percent = FALSE, digits = 2,suffix='%'))
+#    )
+#  )
+
+metric_descriptions <- c(
+  "N-terminally"           = "PSMs identified with a free or modified N-terminus.",
+  "Ace"                     =     "PSMs N-terminally Acetilated",    
+  "C-terminal"             = "PSMs representing the protein C-terminus.",
+  'Gln-NtermQ'              = "PSMs N-termilayy with  pyro-glutamate modification",
+  "NH2"                    = "PSMs with C-terminal.",
+  "N-terminally with H"     = 'PSMs N-terminally that contain Histidine in their sequence',
+  "%.enrich.SCX.step"      = "Efficiency of the Strong Cation Exchange enrichment step.",
+  "Total PSM"              = "Sum of N-terminally, C-terminal, and NH2 PSMs.",
+  "Nterminally Acetylated" = "Fraction of N-terminal PSMs carrying an Acetyl group."
+)
+reactable(
+  glb_df, 
+  pagination = FALSE,
+  highlight = TRUE,
+  rowStyle = function(index) {
+    if (glb_df$label[index] == "Total PSM") {
+      list(fontWeight = "bold", background = "#f8f9fa", borderTop = "2px solid #dee2e6")
+    } else if (glb_df$label[index] == "%.enrich.SCX.step") {
+      list(fontStyle = "italic", color = "#2c3e50")
+    }
+  },
+  columns = list(
+    # Use 'Metric' if you renamed the column as discussed
+    label = colDef(
+      name = "Label",
+      cell = function(value) {
+        # Lookup description based on the row value
+        desc <- metric_descriptions[value]
+
+        # 2. Force it to be a simple string (remove names and handle NULLs)
+        if (is.na(desc) || is.null(desc)) {
+          display_text <- ""
+        } else {
+          display_text <- unname(desc) 
+        }
+
+        # Return an HTML span with a title attribute for the tooltip
+        tags$span(style = "cursor: help; border-bottom: 1px dotted #ccc;", 
+                  title = display_text, 
+                  value)
+      }
+    ),
+    count_absolute = colDef(name = "Count", format = colFormat(separators = TRUE,  locales = "fr-FR")),
+    percentage = colDef(
+      name = "Percentage",
+      format = colFormat(digits = 2, suffix = "%")
+    )
+  ),
+  theme = lab_report_theme
+)
+```
+
+
+
+## PSMs Count per Sample
+
+```{r grp_viz}
+grp_df <- grp_df %>%  arrange(sample)
+
+
+nACe_pec <-  grp_df %>% filter(label == 'Nterminally Acetylated') %>% arrange(sample)
+
+summary_stats <- nACe_pec %>%
+  summarise(
+    Metric = "N-terminally Acetylated (%)",
+    n_samples = n(),
+    Mean = mean(percentage, na.rm = TRUE),
+    SD = sd(percentage, na.rm = TRUE),
+    CV_percent = (SD / Mean) * 100  # Coefficient of Variation is often useful in PTM analysis
+  )
+ace_mean <- mean(nACe_pec$percentage, na.rm = TRUE)
+ace_sd <- sd(nACe_pec$percentage, na.rm = TRUE)
+
+Nter_ace_perc_plot <-   ggplot ( nACe_pec, aes(x = factor(sample, levels = sample), y = percentage)) +
+  geom_col(fill = "steelblue") +
+  # Add the mean line
+  geom_hline(yintercept = ace_mean, linetype = "dashed", color = "red", size = 1) +
+  # Add a label for the mean
+  annotate("text", x = -Inf, y = ace_mean + 1, label = paste("Mean:", round(ace_mean, 2)), color = "red", hjust = - 0.1) +
+  scale_x_discrete(drop = FALSE) +
+  labs(x = "Sample", y = "% Nterminally Acetylated", title = "Nterminally Acetylated") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+Nter_ace_perc_plot
+
+##
+reactable(
+  summary_stats,
+  columns = list(
+    Metric = colDef(name = "Analysis Target", minWidth = 200, style = list(fontWeight = "bold")),
+    n_samples = colDef(name = "Sample Count", align = "center"),
+    Mean = colDef(
+      name = "Average (%)",
+      format = colFormat(digits = 2, suffix = "%"),
+      style = list(background = "#f0f9ff", fontWeight = "bold")
+    ),
+    SD = colDef(
+      name = "Std. Deviation",
+      format = colFormat(digits = 2)
+    ),
+    CV_percent = colDef(
+      # We replace 'name' and 'helpText' with a custom header function
+      header = function(value) {
+        tags$span(title = "Coefficient of Variation (SD/Mean)", "CV (%)")
+      },
+      format = colFormat(digits = 1, suffix = "%")
+    )
+  ),
+  bordered = TRUE,
+  highlight = TRUE,
+  theme = lab_report_theme
+
+)
+
+
+
+## here should do the mean visualization 
+
+ reactable(grp_df, groupBy= 'sample' ,  
+ pagination = FALSE,
+  highlight = TRUE,
+  rowStyle = function(index) {
+    row_label <- grp_df$label[index]
+    if (is.na(row_label)) return(NULL) # Skip styling for the group header rows
+    if (row_label == "Total PSM") {
+      list(fontWeight = "bold", background = "#f8f9fa", borderTop = "2px solid #dee2e6")
+    } else if (row_label == "%.enrich.SCX.step") {
+      list(fontStyle = "italic", color = "#2c3e50")
+    }
+    },
+  columns = list(
+    # Use 'Metric' if you renamed the column as discussed
+    label = colDef(
+      name = "Label",
+      cell = function(value) {
+        # Lookup description based on the row value
+        desc <- metric_descriptions[value]
+
+        # 2. Force it to be a simple string (remove names and handle NULLs)
+        if (is.na(desc) || is.null(desc)) {
+          display_text <- ""
+        } else {
+          display_text <- unname(desc) 
+        }
+
+        # Return an HTML span with a title attribute for the tooltip
+        tags$span(style = "cursor: help; border-bottom: 1px dotted #ccc;", 
+                  title = display_text, 
+                  value)
+      }
+    ),
+    count_absolute = colDef(name = "Count", format = colFormat(separators = TRUE, locales = "fr-FR")),
+    percentage = colDef(
+      name = "Percentage",
+      format = colFormat(digits = 2, suffix = "%")
+    )
+  ),
+  theme = lab_report_theme
+
+)
+ 
+```
+
+
+# Quantitative QC 
+
+
+Here goes other text.  (From Peptide file )
+
+```{r idplot}
+#| layout-ncol: 2
+#| fig-cap: 
+#|   - "Quantified precursor for all the samples"
+#|   - "Quantified precursor aggregated per groups"
+
+fig.prec <-
+  ggplot (pepid_df, aes(x = factor(Sample, levels = Sample), y = n_precursors)) +
+  geom_col (fill = "steelblue") +
+  scale_x_discrete(drop = FALSE) +
+  labs(x = "Sample", y = "Number of modified peptides", title = "Unique modified peptides") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fig.prec
+
+
+
+
+fig.grp <-
+  ggplot (pepidgrp_df, aes(x = factor(Group, levels = Group), y = n_precursors)) +
+  geom_col (fill = "steelblue") +
+  scale_x_discrete(drop = FALSE) +
+  labs(x = "Group", y = "Number of modified peptides", title = "Unique modified peptides") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fig.grp
+
+```
+
+
+#  Overlapping Acetylated Peptide Across Groups
+
+
+*To be checked !!*
+I use all the precursor (from PEPTIDE file) with: 
+
+- *Nterm_mod.HS == "Acetyl* and *quant_valid.HS == TRUE*
+
+- *pep_start is 1|2*.
+
+for every group I can make an upset plot, containing the replicates. See below.
+
+```{r upset_peptide}
+#| results: asis
+
+#pepidsample_df
+
+grp_value  <- expdesign %>% distinct(Group) %>% pull()
+my_list <- list()
+my_peptide_info <- list()
+for ( g_ in grp_value) {
+      my_list[[g_]] <- l_ace_grp[[g_]]$pep_seq
+            my_peptide_info[[g_]] <-  l_ace_grp[[g_]] %>% select(prot_acc,pep_seq,prot_desc)
+
+}
+
+ann_df <- bind_rows(my_peptide_info) %>% distinct(prot_acc, pep_seq,prot_desc)
+
+ntermreport::render_child(data = my_list ,
+              label = g_ , 
+              path= "",  
+              template='_template_upsetDIAG.Rmd') 
+
+#upsetjs() %>%  fromList(my_list )  %>% generateDistinctIntersections()
+
+all_elements <- unique(unlist(my_list)) 
+all_elements <- all_elements[!is.na(all_elements)]
+# Build logical membership table
+intersection_ <- data.frame(
+  Elements = all_elements,
+  sapply(names(my_list), function(nm) all_elements %in% my_list[[nm]])
+)
+
+all_intersections_ <- ntermreport::get_all_intersections(intersection_)
+
+all_intersections_filt <- all_intersections_[sapply(all_intersections_, function(x) x$count > 50)]
+
+cat('<div class="accordion" id="intersection-accordion">')
+
+# Sort intersections by count (descending)
+sorted_names <- names(all_intersections_filt)[order(
+  sapply(all_intersections_filt, function(x) x$count),
+  decreasing = TRUE
+)]
+
+  # Generate individual sections for each intersection
+for (name in sorted_names) {
+  data <- all_intersections_filt[[name]]
+        
+  prot_map <- ann_df %>%
+  filter(pep_seq %in% data$elements) %>%
+    group_by(pep_seq) %>%
+    summarise(proteins = list(prot_acc),  protein_description = list(prot_desc),.groups = "drop")
+
+    lista_final <- list(
+      name = name,
+      count = data$count,
+      elements = data$elements,
+      proteins =   prot_map %>% 
+                  mutate(protein_ids = sapply(proteins, paste, collapse = "; ")) %>% 
+                  pull(protein_ids),
+      protein_description =   prot_map %>%    
+                  mutate(protein_description = sapply(protein_description, paste, collapse = "; ")) %>%
+                  pull(protein_description) ,
+      set_indicators = ntermreport::create_set_indicators(data$sets)
+    )
+    log_info(name)
+    log_info(length(lista_final$proteins))
+    log_info(length(lista_final$protein_description))
+    log_info(length(lista_final$elements))
+    
+    ntermreport::render_child(data = lista_final ,
+                 label = 'protein' , 
+                 path= "",  
+                 template='_template_intersection.Rmd') 
+  }
+    cat('</div>') 
+
+
+```
+
+#  Overlapping Acetylated Peptide Within Groups
+
+::: panel-tabset
+```{r  perGroup}
+#| results: asis
+
+#grp_value
+
+for (grp in grp_value){ 
+
+  sample_grp  <- expdesign %>% filter( Group == grp ) %>% pull(Sample)
+  cat( '## ', paste(grp,sep=' '), '\n\n')
+  log_info(paste('inside -  perGroup ',grp,collapse= '\n'))
+  my_list_ <- list()
+  for ( g_ in sample_grp) {
+        my_list_[[g_]] <- l_ace_[[g_]]$pep_seq
+   }
+
+  p <- upsetjs() %>%  fromList(my_list_ )  %>% generateDistinctIntersections()
+  print(htmltools::tagList(p))
+  cat('\n\n') # Add space before the next tab
+
+}
+
+
+```
+
+:::

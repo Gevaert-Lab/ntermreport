@@ -314,7 +314,31 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
 
   tryCatch( expr = {
     
+   folder_path <- dirname(file_nterm)
+
+    # 3. Search for the other file using a regular expression
+    # Example: Look for any PDF file that contains the word "Summary"
+    target_pattern <- "*_output_peptide.tsv"
+
+    matching_files <- list.files(
+      path = folder_path, 
+      pattern = target_pattern , 
+      full.names = TRUE  # This returns the absolute path
+    )
+    if (length(matching_files) > 0) {
+      file_ntermpep <- matching_files[1] 
+      } else if (length(matching_files) > 1) {
+          stop("Multiple peptide files found! Please include only the one relevant with the current experiment.")
+      }else{
+        return(list(
+            error = paste0(" Peptide tsv file not found.\n Check the presence of *_output_peptide.tsv in : ", folder_path, '\n'),
+            status = 1, nterm_data = NULL, df_design = NULL, nterm_pep =NULL
+          ))
+
+    }
     df <-  read.delim(file_nterm, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
+
+    df_pep <- read.delim(file_ntermpep, header = TRUE, stringsAsFactors = FALSE, check.names = TRUE)
     #" add exp design data
 
     ## add  possible control
@@ -330,272 +354,292 @@ read_data <- function(file_nterm, file_expdesign, grp_selected) {
       if (length(grp_set) < 1) {
         return(list(
           error = paste0(" select_group '", nm, "' must contain at least one list"),
-          status = 1, nterm_data = NULL, df_design = NULL
+          status = 1, nterm_data = NULL, df_design = NULL, nterm_pep =NULL
         ))
       }
     
     # Check that all values exist in design
       invalid <- setdiff(grp_set, valid_groups)
       if (length(invalid) > 0) {
-        return(list(
-          error = paste0(
-            "List  -> '", nm, "' of select_group contains invalid values: ",
-            paste(invalid, collapse = ", "),
-            "\nPossible values are: ", paste(valid_groups, collapse = ", ")
-          ),
-          status = 1, nterm_data = NULL, df_design = NULL
-        ))
+        1
       }
     }
     
     # add exp design to output
     
     df <- df %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
+    ## do the same in pep file 
+    
+    df_pep <- df_pep %>% mutate(Run = basename(input_file) ) %>% mutate (Run =  gsub('.raw','',Run))
+
+    checkedLength_pep  <- check_length_design_data (df_pep, design)
+ 
     # sanity check between data and exp design info 
-    checkedLength  <- check_length_design_data (df, design)
+    checkedLength_psm  <- check_length_design_data (df, design)
 
-    if (checkedLength$status==1){
-
-    return( list(error= checkedLength$error, status= checkedLength$status ,nterm_data =  NULL, df_design = NULL ))
+    # 3. Handle CRITICAL ERRORS (Status 1)
+    # If either file fails completely, return the error immediately
+    if (checkedLength_psm$status == 1 || checkedLength_pep$status == 1) {
+        # Determine which error to show (prioritize df, then pep)
+        err_msg <- if(checkedLength_psm$status == 1) checked_df$error else checkedLength_pep$error
+        
+        return(list(
+            error      = err_msg, 
+            status     = 1, 
+            nterm_data = NULL, 
+            df_design  = NULL, 
+            nterm_pep  = NULL
+        ))
     }
    
-    if (checkedLength$status==2){
-       df <- checkedLength$data_
-      log_info(checkedLength$message)
+        # If status is 2, the function usually returns a filtered version of the data
+    if (checkedLength_psm$status == 2) {
+        df <- checkedLength_psm$data_
+        log_info(paste("PSM:", checkedLength_psm$message))
+    }
+
+    if (checkedLength_pep$status == 2) {
+        df_pep <- checkedLength_pep$data_
+        log_info(paste("Peptide:", checkedLength_pep$message))
     }
 
     ## steps shared chen the data is ok. 
     df <- df %>%
       left_join(design %>%
                   select(Run, Group, Sample), join_by(Run))
-
+    
     df$Percent_Acetylation <- (df$L.H * 100) / (df$L.H + 1)
+    
+    #" other step for peptide file 
+    df_pep <- df_pep %>%
+      left_join(design %>%
+                  select(Run, Group, Sample), join_by(Run))
 
-
-    return( list(error= '', status= 0, nterm_data =  df, df_design = design ))
+    return( list(error= '', status= 0, nterm_data =  df, df_design = design , nterm_pep = df_pep))
   },error = function(err){
     print(paste("Reading Design / Nterm PSM  file :  ",err))
-    return( list(error= err, status= 1,  nterm_data =  NULL, df_design = NULL ))
+    return( list(error= err, status= 1,  nterm_data =  NULL , nterm_pep =  NULL , df_design = NULL, nterm_pep =NULL ))
 
   } )
 
 }
 
+
+
 #'@author Andrea Argentini
-#' @title  group_stat
-#' @description Compute statistics at group level. Statistic and its labels are
-#' parameters at the moment.
+#' @title  process_filter_wip
 #'
-#' @param d_nterm input n-terminal data frame
-#' @return res dataframe with all the computed statistics
-#' @return l_uniq_protein list of all the unique protein per group
-#' @importFrom  dplyr distinct pull filter
-#' @importFrom magrittr  %>% 
-#' @importFrom  logger log_info
-
-group_stat <- function(d_nterm) {
-
-  log_info('Group Statistics Start ...')
-
-  filter_<- list( '','','',   '*Gln->pyro-Glu*',
-                  '*Acetyl (N-term)*',
-                  '*Acetyl:2H\\(3\\)C13\\(1\\) \\(N-term\\)*',
-                  list('*R$|K$','*pyro-Glu*|*Acetyl*'),
-                  list('*R$|K$','*pyro-Glu*|*Acetyl*'))
-  label_ <- c('total','unique_peptide','unique_protein',
-              'pyroglu_','ace','AcD4','C-terminal','NH2')
-
-  tryCatch( expr = {
-  groups <- d_nterm %>% distinct(Group) %>% pull()
-
-  all_results <- lapply(groups, function(group_name) {
-    g_ <- d_nterm %>% filter(Group == group_name)
-    countpeptides <- nrow(g_)
-    log_info(paste0('statistics for: ',group_name, ' -->  \n'))
-    results_list <- lapply(seq_along(filter_), function(i) {
-      process_filter(filter_[[i]], label_[i], g_, countpeptides)
-    })
-    names(results_list) <- label_
-
-    return(list(group = group_name, results = results_list))
-  })
-  names(all_results) <- groups
-
-  ## create a df
-
-  res_df <- do.call(rbind, lapply(all_results, function(group_entry) {
-    group_name <- group_entry$group
-    results_list <- group_entry$results
-
-    data.frame(
-      group = group_name,
-      metric = names(results_list),
-      count_absolute = sapply(results_list, function(x) x$count_main),
-      percentage = sapply(results_list, function(x) x$percentage_main),
-      stringsAsFactors = FALSE
-    )
-  }))
-  rownames(res_df) <- NULL
-  log_info('Group Statistics End ...')
-  },error = function(err){
-    print(paste("Group Statistics :  ",err))
-    return( list(error= err, status= 1,res =NULL ,l_uniq_protein =NULL))
-  })
-
-  tryCatch( expr = {
-  log_info('Group Unique protein Start ...')
-
-  ## protein unique list
-  distinct_proteins_list <- lapply(groups, function(group_name) {
-    g_ <- d_nterm %>% filter(Group == group_name)
-    unique_proteins <- g_ %>% distinct(prot_acc) %>% pull(prot_acc)
-    return(unique_proteins)
-  })
-  names(distinct_proteins_list) <- groups
-  log_info('Group Unique protein End ...')
-
-  },error = function(err){
-    print(paste("Group unique protein :  ",err))
-    return( list(error= err, status= 1,res =NULL ,l_uniq_protein =NULL))
-  })
+#' @description 
+#' Applies a specific filtering logic to the input data frame and computes 
+#' the absolute count of the remaining rows. This function supports 
+#' tidy evaluation for dynamic filtering.
+#' @param filter_item A list containing the filtering logic (e.g., `filter_item$logic`).
+#' @param filter_label A character string used as a label for the specific metric.
+#' @param data The input data frame to be filtered.
+#' @param task An array or vector of mascot tasks used for context (if applicable within the logic).
+#' @return A list containing:
+#' \itemize{
+#'   \item{filter_name}{ The provided `filter_label`.}
+#'   \item{val_count}{ The number of rows (integer) after applying the filter.}
+#' }
+#' @importFrom dplyr %>% filter
+#' @importFrom logger log_info
 
 
-
-  return( list(error= '', status= 0,  res = res_df, l_uniq_protein = distinct_proteins_list ))
+process_filter_wip <- function(filter_item, filter_label, data , task) {
+    ## total
+  
+     print(filter_item$logic)
+    val_count <-  data %>% filter(!! filter_item$logic)  %>% nrow()
+   
+    return(list(
+      filter_name = filter_label,
+      val_count = val_count
+    ))
 }
 
 
 
+
 #'@author Andrea Argentini
-#' @title  sample_stat
+#' @title  global_PEP_general
 #'
-#' @description Compute statistics at sample level.Statistic and its labels are
-#' parameters at the moment.
-#' @param d_nterm input n-terminal data frame
-#' @return res dataframe with all the computed statistics
-#' @return l_uniq_protein list of all the unique protein per group
-#' @importFrom  dplyr distinct pull filter
+#' @description  Calculates the number of identified precursors per Sample and Group,
+#' and filters for N-terminally acetylated peptides based on specific 
+#' methionine (M) cleavage logic
+
+#' @param d_nterm input n-terminal data frame parsed from peptide file 
+#' @param design dataframe realted to the design experiment 
+#' @return A list containing:
+#' \itemize{
+#'   \item{error}{ Error message string.}
+#'   \item{status}{ Status code (0 for success).}
+#'   \item{pep_cnt_sample}{ Precursor counts per sample.}
+#'   \item{pep_cnt_group}{ Precursor counts per group.}
+#'   \item{ace_group}{ Acetylated peptides split by group.}
+#'   \item{ace_sample}{ Acetylated peptides split by sample.}
+#' }
 #' @importFrom  logger log_info
-
-
-
-sample_stat <- function(d_nterm) {
-
-  log_info('Sample Statistics Start ...')
-
-  filter_<- list( '','','',   '*Gln->pyro-Glu*',
-                  '*Acetyl (N-term)*',
-                  '*Acetyl:2H\\(3\\)C13\\(1\\) \\(N-term\\)*',
-                  list('*R$|K$','*pyro-Glu*|*Acetyl*'),
-                  list('*R$|K$','*pyro-Glu*|*Acetyl*'))
-  label_ <- c('total','unique_peptide','unique_protein',
-              'pyroglu_','ace','AcD4','C-terminal','NH2')
-
-  tryCatch( expr = {
-    samples <- d_nterm %>% distinct(Sample) %>% pull()
-
-    all_results <- lapply(samples, function(sample_name) {
-      g_ <- d_nterm %>% filter(Sample == sample_name)
-      countpeptides <- nrow(g_)
-      log_info(paste0('statistics for Sample : ',sample_name, ' -->  \n'))
-      results_list <- lapply(seq_along(filter_), function(i) {
-        process_filter(filter_[[i]], label_[i], g_, countpeptides)
-      })
-      names(results_list) <- label_
-
-      return(list(sample = sample_name, results = results_list))
-    })
-    names(all_results) <- samples
-
-    ## create a df
-
-    res_df <- do.call(rbind, lapply(all_results, function(group_entry) {
-      sample_name <- group_entry$sample
-      results_list <- group_entry$results
-
-      data.frame(
-        sample = sample_name,
-        metric = names(results_list),
-        count_absolute = sapply(results_list, function(x) x$count_main),
-        percentage = sapply(results_list, function(x) x$percentage_main),
-        stringsAsFactors = FALSE
-      )
-    }))
-    rownames(res_df) <- NULL
-    log_info('Sample Statistics End ...')
-    },error = function(err){
-      print(paste("Sample Stats Computation :  ",err))
-      return( list(error= err, status= 1,q_feat =NULL ))
-    })
-
-  ## protein unique list
-
-  log_info('Sample Unique protein  Start ...')
-  tryCatch( expr = {
-  distinct_proteins_list <- lapply(samples, function(sample_name) {
-    g_ <- d_nterm %>% filter(Sample == sample_name)
-    unique_proteins <- g_ %>% distinct(prot_acc) %>% pull(prot_acc)
-    return(unique_proteins)
-  })
-  names(distinct_proteins_list) <- samples
-  log_info('Sample Unique protein End ...')
-
-  },error = function(err){
-    print(paste("Unique protein  samples :  ",err))
-    return( list(error= err, status= 1,q_feat =NULL ))
-  })
-
-  return( list(error= '', status= 0,  res = res_df, l_uniq_protein = distinct_proteins_list ))
-}
-
-
-#'@author Andrea Argentini
-#' @title  global_stat
-#'
-#' @description Global statistics computed for the entire dataset.Statistic and its labels are
-#' parameters at the moment.
-#' @param d_nterm input n-terminal data frame
-#' @return res dataframe with all the computed metrics
- #' @importFrom  logger log_info
-
+#' @importFrom dplyr %>% distinct count arrange filter select
 #'
 
-global_stat <- function(d_nterm) {
+global_PEP_general  <- function(pep_nterm, design ) {
 
   log_info('Global Statistics Start ...')
 
-  filter_option <- list('*Gln->pyro-Glu*',
-                        '*Acetyl (N-term)*',
-                        '*Acetyl:2H\\(3\\)C13\\(1\\) \\(N-term\\)*',
-                        list('*R$|K$','*pyro-Glu*|*Acetyl*'),
-                        list('*R$|K$','*pyro-Glu*|*Acetyl*'))
-  label_filter <- c('pyroglu_','ace','AcD4','C-terminal','NH2')
+  # table logic    
+  df_count_run <- pep_nterm %>%
+  distinct(Sample, pep_seq, All_Nterm_mods_identified) %>%
+  count(Sample, name = "n_precursors") %>%
+  arrange(Sample)
+  
+  df_count_group <- pep_nterm %>%
+  distinct(Group, pep_seq, All_Nterm_mods_identified) %>%
+  count(Group, name = "n_precursors") %>%
+  arrange(Group)
+  
+  # ration acetilation 
+  
+  # pep_nterm %>% filter(Nterm_mod.HS == "Acetyl")  %>%  filter (quant_valid.HS == TRUE ) %>%  
+  #   filter(pep_start %in% c(1, 2)) %>%  filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") 
 
-  countpeptides <- nrow(d_nterm)
+  all_ <- pep_nterm %>% filter(Nterm_mod.HS == "Acetyl")  %>%  filter (quant_valid.HS == TRUE ) %>%  
+    filter(pep_start %in% c(1, 2))  %>% 
+    select(pep_modified_seq, Nterm_mod.HS, pep_start,pep_res_before,prot_acc, prot_desc,pep_seq ,Sample, Group) 
 
+  ace_groups_pep <- split(all_, all_$Group)
+  ace_sample_pep <- split(all_, all_$Sample)
+ 
+  return(list(error= '', status= 0,pep_cnt_sample = df_count_run  ,  pep_cnt_group = df_count_group, 
+                       ace_group =  ace_groups_pep ,  ace_sample =  ace_sample_pep ) )
+}
+
+
+
+#' @author Andrea Argentini
+#' @title global_PSM_general
+#'
+#' @description 
+#' Computes global PTM statistics from PSM data using a list of regular expressions. 
+#' Calculates specific proteomics metrics including SCX enrichment efficiency 
+#' and N-terminal acetylation percentages across the entire dataset and per sample.
+#'
+#' @param d_nterm A data frame containing PSM-level N-terminal data.
+#' @param stat_reg A list of regular expressions defining the modifications to search for.
+#' @param stat_name A character vector of names corresponding to the `stat_reg` patterns.
+#' 
+#' @return A list containing:
+#' \itemize{
+#'   \item{error}{ Character string containing error messages, if any.}
+#'   \item{status}{ Integer status code (0 for success, 1 for error).}
+#'   \item{res}{ Dataframe of global summary statistics.}
+#'   \item{res_sample}{ Dataframe of summary statistics broken down by sample.}
+#' }
+#' 
+#' @importFrom logger log_info
+#' @importFrom dplyr %>% distinct pull filter mutate case_when
+#' @importFrom tibble add_row
+
+
+global_PSM_general  <- function(d_nterm, stat_reg, stat_name) {
+
+  log_info('Global Statistics Start ...')
+  #  sorted by num id 
+  # task[1] KNfix
+  # task[2] NH2
+  task <- d_nterm %>% distinct(mascot_task) %>% pull() %>% as.integer() %>% sort() %>%   as.array()
+  #browser()
+   ## compute the statistics 
+  summarize_peptide_stats <- function(counts_list) {
+        # 1. Convert list to vector
+        counts <- vapply(counts_list, function(x) x$val_count, numeric(1))
+        
+        # 2. Pre-calculate the denominator constant
+        # This avoids the "object not found" error later
+        total_val <- sum(counts[c('N-terminally', 'C-terminal', 'NH2')], na.rm = TRUE)
+        
+        # 3. Build the data frame
+        df <- data.frame(
+          label = names(counts_list),
+          count_absolute = counts,
+          stringsAsFactors = FALSE
+        ) %>%
+          # Add the custom enrichment calculation row
+          add_row(
+            label = "%.enrich.SCX.step", 
+            count_absolute = (counts['N-terminally'] + counts['C-terminal'] - counts['N-terminally with H'])
+          ) %>%
+          # Calculate percentages using the pre-calculated constant
+          mutate(
+            percentage = case_when(
+              total_val == 0 ~ 0,
+              label %in% c('N-terminally', 'C-terminal', 'N-terminally with H', 'NH2', '%.enrich.SCX.step') ~ (count_absolute / total_val) * 100,
+              TRUE ~ NA_real_
+            )
+          ) %>%
+          # Add the Total row at the very bottom using the constant
+          add_row(
+            label = "Total PSM", 
+            count_absolute = total_val,
+            percentage = 100.00
+          )     %>%
+          # Add the Total row at the very bottom using the constant
+          add_row(
+            label = "Nterminally Acetylated",
+            percentage = (counts['Ace'] / total_val) * 100
+          )
+          
+        return(df)
+
+      }
+   
+  log_info('Global Statistics Sample  ...')
   tryCatch( expr = {
 
-    results_list <- lapply(seq_along(filter_option), function(i) {
-      process_filter(filter_option[[i]], label_filter[i], d_nterm,countpeptides )
-    })
-    names(results_list) <- label_filter
+  results_list <- lapply(seq_along(stat_reg), function(i) {
+    process_filter_wip(stat_reg[[i]], stat_name[i], d_nterm, task  )
+  })
+  names(results_list) <- stat_name
 
-    ## result
-    res <- data.frame(
-      label = names(results_list),
-      count_absolute = sapply(results_list, function(x) x$count_main),
-      percentage = sapply(results_list, function(x) x$percentage_main)
-    )
-
-    rownames(res) <- NULL
-    log_info('Global Statistics End ...')
-    return( list(error= '', status= 0,  res = res ))
+  res <- summarize_peptide_stats(results_list)   
     
-  },error = function(err){
+  samples <- d_nterm %>% distinct(Sample) %>% pull()
+
+   results_sample_df <- lapply(samples, function(sample_name) {
+        # 1. Filter data for this sample
+        sample_data <- d_nterm %>% filter(Sample == sample_name)
+        
+        # 2. Get raw counts using your existing logic
+        raw_counts <- lapply(seq_along(stat_reg), function(i) {
+          process_filter_wip(stat_reg[[i]], stat_name[i], sample_data, task)
+        })
+        names(raw_counts) <- stat_name
+        
+        # 3. Use the new function to get the final table for this sample
+        final_table <- summarize_peptide_stats(raw_counts)
+        
+        # Add a column so we know which sample this belongs to
+        final_table$sample <- sample_name
+        
+        return(final_table)
+      })
+  
+res_df_sample <- do.call(rbind, results_sample_df)
+    
+
+rownames(res) <- NULL
+rownames(res_df_sample) <- NULL
+
+log_info('Global Statistics End ...')
+return( list(error= '', status= 0,  res = res ,
+                           res_sample = res_df_sample))
+},error = function(err){
     print(paste("Global Stat :  ",err))
-    return( list(error= err, status= 1,res =NULL ))
+    return( list(error= err, status= 1,res =NULL,res_sample=NULL  ))
   })
 }
+
+
 
 #'@author Andrea Argentini
 #' @title  process_filter
@@ -699,148 +743,3 @@ quant_base_ <- function(d_nterm){
   } )
 }
 
-
-
-#'@author Andrea Argentini
-#' @title  acetyl_stat_
-#'
-#' @description Process statistics for percentage of acetylation
-#' @param d_nterm input data frame
-#' @return list of dataframes.For each group , cTIS and aTIS dataframe are included.
-#' @importFrom  dplyr filter
-
-acetyl_stat_ <- function(d_nterm) {
-
-  log_info('Acetyl Statistics Start...')
-
-  tryCatch( expr = {
-    groups <- d_nterm %>% distinct(Group) %>% pull()
-
-    res__ <- lapply(groups, function(group_name) {
-      g_ <- d_nterm %>% filter(Group == group_name)
-      start_ <- g_ %>% filter(grepl("Acetyl \\(N-term\\)", pep_modified_seq, fixed = FALSE)) %>%
-        filter (quant_valid == TRUE )  %>%
-        filter(pep_res_before != "R") %>%
-        filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") %>%
-        filter(pep_start %in% c(1, 2))
-      aTIS_ <- g_ %>% filter(grepl('Acetyl \\(N-term\\)', pep_modified_seq, fixed = FALSE)) %>%
-        filter (quant_valid == TRUE )  %>%
-        filter(pep_res_before != "R") %>%
-        filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") %>%
-        filter(pep_start > 2)
-      return(list( atis = aTIS_, start_= start_))
-    })
-
-    names(res__) <- groups
-
-    res__processed <- lapply(res__, function(sublist) {
-      list(
-        p_start_ = process_dataset(sublist$start_),
-        p_atis = process_dataset(sublist$atis)
-      )
-    })
-    names(res__processed) <- groups
-
-      log_info('Acetyl Statistics End ...')
-
-    return( list(error= '', status= 0, res = res__processed ))
-  }, error = function(err){
-    print(paste("acetyl_statisics  :  ",err))
-    return( list(error= err, status= 1,res =NULL ))
-  } )
-}
-
-
-
-#'@author Andrea Argentini
-#' @title  acd4_stat_
-#'
-#' @description Process statistics for ACd4 low confident
-#' @param d_nterm input data frame
-#' @return list of dataframes.For each group , cTIS and aTIS dataframe are included.
-#' @importFrom  dplyr filter pull distinct
-#' @importFrom logger log_info
-
-
-acd4_stat_ <- function(d_nterm) {
-
-  log_info('ACD4 Statistics Start ...')
-
-  tryCatch( expr = {
-    groups <- d_nterm %>% distinct(Group) %>% pull()
-
-    res__ <- lapply(groups, function(group_name) {
-      g_ <- d_nterm %>% filter(Group == group_name)
-      start_ <- g_ %>% filter(grepl("Acetyl:2H\\(3\\)C13\\(1\\) \\(N-term\\)", pep_modified_seq, fixed = FALSE)) %>%
-        filter (quant_valid == TRUE )  %>%
-        filter(pep_res_before != "R") %>%
-        filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") %>%
-        filter(pep_start %in% c(1, 2))
-      aTIS_ <- g_ %>% filter(grepl('Acetyl:2H\\(3\\)C13\\(1\\) \\(N-term\\)', pep_modified_seq, fixed = FALSE)) %>%
-        filter (quant_valid == TRUE )  %>%
-        filter(pep_res_before != "R") %>%
-        filter(substr(pep_seq, 1, 1) == "M" | pep_res_before == "M") %>%
-        filter(pep_start > 2)
-      return(list( atis = aTIS_, start_= start_))
-    })
-
-    names(res__) <- groups
-
-    res__processed <- lapply(res__, function(sublist) {
-      list(
-        p_start_ = process_dataset(sublist$start_),
-        p_atis = process_dataset(sublist$atis)
-      )
-    })
-    names(res__processed) <- groups
-
-    log_info('acd4 Statistics ends ...')
-
-    return( list(error= '', status= 0,  res = res__processed ))
-   } ,error = function(err){
-      print(paste("acd4 Statistics :  ",err))
-      return( list(error= err, status= 1,res =NULL ))
-    })
-
-}
-
-#'@author Lode
-#' @title  process_dataset
-#'
-#' @description Add futher aggregated metrics from acytilated and ACd4 statistics.
-#' @param dataset input  data frame
-#' @return Data frame with aggregatted information
-#' @importFrom  dplyr group_by summarise distinct left_join select mutate
-#' @importFrom stats  median
-#'
-process_dataset <- function(dataset) {
-  # Step 1: Summarize Percent_Acetylation by concatenating values
-  unique_filtered <- dataset %>%
-    group_by(pep_modified_seq) %>%
-    summarise(
-      Percent_Acetylation = paste(round(as.numeric(Percent_Acetylation), 2), collapse = ", "),
-      .groups = "drop"  # Drop grouping after summarization
-    )
-
-  # Step 2: Merge back the concatenated Percent_Acetylation
-  merged <- dataset %>%
-    distinct(pep_modified_seq, .keep_all = TRUE) %>%  # Retain unique pep_modified_seq rows
-    left_join(unique_filtered, by = "pep_modified_seq") %>%  # Add concatenated Percent_Acetylation
-    select(-Percent_Acetylation.x)  # Remove old Percent_Acetylation column if duplicated
-
-  # Step 3: Calculate Median_Percentage_Acetylation from the concatenated Percent_Acetylation
-  merged <- merged %>%
-    mutate(
-      # Split the concatenated string into individual numeric values
-      Percent_Acetylation_List = strsplit(as.character(Percent_Acetylation.y), ", "),
-
-      # Calculate the median for each group based on the Percent_Acetylation values
-      Median_Percentage_Acetylation = sapply(Percent_Acetylation_List, function(x) {
-        # Convert the string list to numeric and calculate median
-        round(median(as.numeric(x), na.rm = TRUE), 2)
-      })
-    ) %>%
-    select(-Percent_Acetylation_List)  # Drop the list column for cleanliness
-
-  return(merged)
-}
