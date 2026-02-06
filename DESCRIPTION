@@ -15,17 +15,17 @@ Encoding: UTF-8
 LazyData: true
 Imports: 
     assertthat,
-    BiocManager,
     dplyr,
     fs,
+    BiocManager,
     glue,
-    htmltools,    
     logger,
-    magrittr,
+    methods,
+    xfun,
     openxlsx,
     purrr,
     quarto,
-    reactable,     
+    stringr,
     rlang,
     tibble,
     tidyr,
@@ -36,5 +36,6 @@ Imports:
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
-    tippy
+    htmltools, 
+    reactable
 RoxygenNote: 7.3.2

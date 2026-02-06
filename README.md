@@ -38,11 +38,11 @@ devtools::install_github('Gevaert-Lab/ntermreport')
 
 ## 📂 Analysis Templates Available
 
-The repository contains four Quarto templates:
+The repository contains  Quarto templates, for different analysis:
 
--   `Template_DDA.qmd`: Template for DDA analysis report from Mascot PSM result
+-  `id_report`: Identification Analysys from Mascot PSM  and petide result
+-  `quant_report `: Quantitification Analysis from Mascot petide files  (not yet available)
 
-Specify the template name via the `template_file` parameter in the `render_nterm_report` function
 
 ------------------------------------------------------------------------
 
@@ -58,7 +58,7 @@ List of the input parameters:
 
 | Pameter | Description |
 |------------------|------------------------------------------------------|
-| **`input_file`** | Full path to the **processed proteomics results file** (e.g., PSM, peptide, or protein table) generated from the N-terminal enriched DDA experiment. |
+| **`input_file`** | Full path to the **PSM  results file** (e.g., PSM, peptide, or protein table) generated from the N-terminal enriched DDA experiment.  The **peptide** file must be located in the folder|
 | **`design_file`** | Full path to the **experimental design CSV file**, containing sample names, conditions, and grouping information. |
 | **`folder_prj`** | Path to the folder where the **report output and intermediate results** will be saved. |
 | **`description`** | Short text describing the experiment’s purpose or biological context. |
@@ -74,14 +74,14 @@ Function parameters:
 | **`params`**| a list of parameters described above |
 | **`template`** | Name of the **Quarto template file** used to generate the report (e.g., `Template_DDA.qmd`). |
 | **`report_folder`** | Folder where the final report will be stored (usually the same as `folder_prj`). |
-| **`report_filename`** | Name of the output report file (e.g., `test.html`). |
+| **`report_filename`** | Name of the output report file without the file extention (e.g., `test`). |
 
 Example:
 
 ``` r
 report_target_folder  <- 'C:\\path\\to\\your\\data\\N-term\\AnalysisFolder'
-template_file = "Template_DDA.qmd"
-output_filename = "test.html"
+template_file = c('id_report')
+output_filename = "test"
 
 params <- list(
   input_file  = 'C:\\path\\to\\your\\data\\N-term\\Nterminal_output_PSM.tsv',
@@ -103,7 +103,9 @@ render_nterm_report(
 )
 ```
 
--   *render_nterm_website*
+ - *render_nterm_website*
+
+**!!  !! Not yet refactored TO DO**
 
     This function renders both DDA and DIA reports in a small website created by Quarto and accepts the following parameters:
 

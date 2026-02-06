@@ -17,6 +17,7 @@ render_child(data, path, label, template)
 }
 \value{
 none
+ @importFrom xfun read_utf8
 }
 \description{
 This function allows to render other template.Rmd in the main quarto document

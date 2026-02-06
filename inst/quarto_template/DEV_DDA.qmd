@@ -29,13 +29,7 @@ params:
   subtitle: ""
   author: "" 
   select_group: ""
-  sample_stat: ""
-  grp_stat: ""
-  glb_stat: ""
-  pep_id: ""
-  pep_id_group: ""
-  ace_group: ""
-  ace_: ""
+  data_path: ""
  
 
 ---
@@ -139,16 +133,15 @@ document.addEventListener('DOMContentLoaded', function() {
 L <- readLines(params$design_file, n = 1)
     if (grepl(";", L)) expdesign <- read.csv2(params$design_file) else expdesign <- read.csv(params$design_file)
 
-glb_df  <-  readRDS(params$glb_stat )
-grp_df <-  readRDS(params$grp_stat )
+data_ <- readRDS(params$data_path)
+glb_df  <-  data_$glb_stat 
+grp_df <- data_$grb_stat
 
-pepid_df  <-  readRDS(params$pep_id )
-pepidgrp_df <-  readRDS(params$pep_id_group )
+pepid_df  <- data_$pep_id 
+pepidgrp_df <- data_$pep_id_group 
 
-l_ace_grp <-  readRDS(params$ace_group )
-l_ace_ <-  readRDS(params$ace_ )
-
-
+l_ace_grp <-  data_$ace_group 
+l_ace_ <- data_$ace_sample 
 
 ```
 
@@ -157,6 +150,7 @@ l_ace_ <-  readRDS(params$ace_ )
  required_packages = c("ggrepel","ggplot","reactable",
                        "plotly","DT",'gridExtra','ggVennDiagram','dplyr' ,'logger','pander','yaml','upsetjs','htmltools','purrr')
  ntermreport::check_dependencies(required_packages)
+
 
  st=format(Sys.time(), "%Y%m%d_%H%M")
 write(as.yaml(params), file =  file.path( params$folder_prj, paste0("NtermDDA_parameter_",st  , ".yaml")))
@@ -290,6 +284,7 @@ reactable(
 grp_df <- grp_df %>%  arrange(sample)
 
 
+
 nACe_pec <-  grp_df %>% filter(label == 'Nterminally Acetylated') %>% arrange(sample)
 
 summary_stats <- nACe_pec %>%
@@ -315,7 +310,8 @@ Nter_ace_perc_plot <-   ggplot ( nACe_pec, aes(x = factor(sample, levels = sampl
 
 Nter_ace_perc_plot
 
-##
+
+
 reactable(
   summary_stats,
   columns = list(
@@ -391,6 +387,7 @@ reactable(
 
 )
  
+
 ```
 
 
@@ -451,7 +448,7 @@ my_list <- list()
 my_peptide_info <- list()
 for ( g_ in grp_value) {
       my_list[[g_]] <- l_ace_grp[[g_]]$pep_seq
-            my_peptide_info[[g_]] <-  l_ace_grp[[g_]] %>% select(prot_acc,pep_seq,prot_desc)
+      my_peptide_info[[g_]] <-  l_ace_grp[[g_]] %>% select(prot_acc,pep_seq,prot_desc)
 
 }
 
@@ -491,7 +488,7 @@ for (name in sorted_names) {
   prot_map <- ann_df %>%
   filter(pep_seq %in% data$elements) %>%
     group_by(pep_seq) %>%
-    summarise(proteins = list(prot_acc),  protein_description = list(prot_desc),.groups = "drop")
+    summarise(proteins = list(prot_acc),  protein_description = list(prot_desc),  .groups = "drop")
 
     lista_final <- list(
       name = name,
@@ -509,6 +506,7 @@ for (name in sorted_names) {
     log_info(length(lista_final$proteins))
     log_info(length(lista_final$protein_description))
     log_info(length(lista_final$elements))
+
     
     ntermreport::render_child(data = lista_final ,
                  label = 'protein' , 

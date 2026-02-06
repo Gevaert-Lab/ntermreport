@@ -22,8 +22,9 @@ render_nterm_website(
 
 \item{report_folder}{Directory where the final rendered website will be copied. Should be writable.}
 
-\item{template_dia}{Path to the Quarto template (.qmd) for the DIA report.
- @return
+\item{template_dia}{Path to the Quarto template (.qmd) for the DIA report.}
+
+\item{project_id}{@return
 Invisibly returns the path to the final website in \code{report_folder}.}
 }
 \description{

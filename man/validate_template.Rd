@@ -2,16 +2,16 @@
 % Please edit documentation in R/render_template.R
 \name{validate_template}
 \alias{validate_template}
-\title{Validate template parameter}
+\title{validate_template}
 \usage{
-validate_template(template)
+validate_template(t_id)
 }
 \arguments{
-\item{template}{The template parameter to be validated.}
+\item{t_id}{Character string representing the template ID.}
 }
 \value{
-TRUE if the template is valid, otherwise stops with an error message.
+The filename (string) of the corresponding Quarto template.
 }
 \description{
-Validate template parameter
+Maps a user-friendly template ID to an actual .qmd file name.
 }

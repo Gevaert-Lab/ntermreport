@@ -4,16 +4,32 @@
 \alias{write_final_result}
 \title{write_final_result}
 \usage{
-write_final_result(acetyl, acd4, quant_base, group_l, path)
+write_final_result(acetyl, pep_dump, quant_base, group_l, path)
 }
 \arguments{
-\item{required_packages}{list with packages to be installed}
+\item{acetyl}{A data frame containing acetylation data. Must include columns: 
+`pep_start`, `pep_seq`, `Group`, `prot_acc`, `prot_isoforms`, and `Percent_Acetylation`.}
+
+\item{pep_dump}{A data frame containing the raw peptide dump information for the third sheet.}
+
+\item{quant_base}{Reserved for future use (currently not used in the active logic).}
+
+\item{group_l}{A vector of group names used for filtering or labeling (currently not used in the active logic).}
+
+\item{path}{Character string specifying the directory path where the Excel file should be saved.}
 }
 \value{
-int
+A named list containing:
+\itemize{
+  \item \code{error}: Character string with the error message if the function fails, otherwise empty.
+  \item \code{status}: Integer; 0 for success, 1 for failure.
+  \item \code{res}: Integer; 1 for success, NULL for failure.
+}
 }
 \description{
-This function save all result in a excell file
+Processes acetylation data by splitting it into N-terminal (positions 1, 2) and 
+internal (positions > 2) peptides. Calculates group-wise statistics (median, SD, count) 
+and exports the results, along with a peptide dump, into a multi-sheet Excel workbook.
 }
 \author{
 Andrea Argentini

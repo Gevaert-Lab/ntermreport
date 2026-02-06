@@ -50,24 +50,36 @@ validate_folder <- function(report_folder) {
 
 
 
-#' Validate template parameter
-#'
-#' @param template The template parameter to be validated.
-#' @return TRUE if the template is valid, otherwise stops with an error message.
+#' @title validate_template
+#' @description Maps a user-friendly template ID to an actual .qmd file name.
+#' @param t_id Character string representing the template ID.
+#' @return The filename (string) of the corresponding Quarto template.
 #' @importFrom assertthat assert_that is.string
-validate_template <- function(template) {
-  # Define the list of valid templates
-  valid_templates <- c( "Template_DDA.qmd","DEV_DDA.qmd")
+#' @export
+validate_template <- function(t_id) {
+  
+  # 1. The Dictionary: Mapping ID to physical .qmd file
+  valid_templates <- list(
+    "id_report"    = "DEV_DDA.qmd",
+    "quant_report" = "DEV_QUANT_DDA.qmd"
+  )
+  # 2. Guard: Ensure the input is a single string
+  assertthat::assert_that(
+    assertthat::is.string(t_id), 
+    msg = "Template ID (t_id) must be a single character string."
+  )
 
-  # Check if template is a string
-  assertthat::assert_that(assertthat::is.string(template), msg = "template must be a string.")
-
-  # Check if template belongs to the list of valid templates
-  if (!template %in% valid_templates) {
-    stop("Invalid template. The template must be one of the following: ", paste(valid_templates, collapse = ", "))
+  # 3. Guard: Check if the ID exists in our dictionary
+  if (!t_id %in% names(valid_templates)) {
+    stop(
+      "Invalid template ID: '", t_id, "'. \n",
+      "Available IDs are: ", paste(names(valid_templates), collapse = ", ")
+    )
   }
 
-  TRUE
+  # 4. Return the filename string
+  # We use [[ ]] to extract just the string value, not a list
+  return(valid_templates[[t_id]])
 }
 
 
@@ -160,6 +172,10 @@ validate_params_minimal <- function(params) {
 
 #' @author andrea Argentini
 #' @title render_dia_report
+#' @param params_report List of parameters for the report.
+#' @param template_file Path to the .qmd template.
+#' @param report_target_folder Directory to save the output.
+#' @param report_filename Name of the output file
 #' @export
 render_ntermdia_report <- function(params_report, template_file, report_target_folder, report_filename){
 
@@ -170,6 +186,9 @@ render_ntermdia_report <- function(params_report, template_file, report_target_f
 
 #' @author andrea Argentini
 #' @title render_quarto_index
+#' @param report_info report 
+#' @param out_file output file 
+#' @param title title of the 
 #' @importFrom  glue  glue_collapse glue
 render_quarto_index <- function(report_info, out_file = "", title = "") {
   title <- paste(" N-terminal Analysis Projects ",title,collapse= "")
@@ -200,6 +219,7 @@ This site contains the following reports:
 #' @param template_dda Path to the Quarto template (.qmd) for the N-Term (DDA) report.
 #' @param report_folder Directory where the final rendered website will be copied. Should be writable.
 #' @param template_dia Path to the Quarto template (.qmd) for the DIA report.
+#' @param project_id 
 #'  @return
 #' Invisibly returns the path to the final website in \code{report_folder}.
 #' @importFrom withr with_dir
@@ -278,7 +298,7 @@ merge_default_parameters <- function  ( params_int  ){
 #' @title Render a DDA report using a Quarto template
 #'
 #' @param params_report parameters
-#' @param template template name
+#' @param template_ids template ids can be a vector 
 #' @param report_folder description
 #' @param report_filename output report file
 #' @details
@@ -300,24 +320,17 @@ merge_default_parameters <- function  ( params_int  ){
 #' @importFrom stringr str_ends str_detect
 #' @importFrom assertthat assert_that is.string
 #' @export
-render_nterm_report <- function(params_report, template, report_folder, report_filename ) {
+render_nterm_report <- function(params_report, template_ids, report_folder, report_filename ) {
 
-  # Validate parameters
-
+  # --- 1. Validation & Setup ---
   #validate_template( template)
   validate_folder(report_folder)
   validate_filename( filename = report_filename)
-  ## to be changed
-  
-  #debug(merge_default_parameters)
   params_report <- merge_default_parameters(params_report)
-  #undebug(merge_default_parameters)
-  #debug(validate_params_minimal)
+
   validate_params_minimal(params_report)
-  #undebug(validate_params_minimal)
   
-  
-  # other set up
+  # Logger set up
   logger::log_threshold(logger::INFO)
   logger::log_appender(logger::appender_console)
   logger::log_formatter(logger::formatter_glue)
@@ -325,149 +338,32 @@ render_nterm_report <- function(params_report, template, report_folder, report_f
   file.create(logfile)
   logger::log_appender(logger::appender_file(logfile ), index = 2)
 
+  log_info ('Start processing...')
+  for (t_id in template_ids) {
+    log_info("Starting processing for template : {t_id}")
 
-  log_info ('Start ...')
-  #debug(read_data)
-  res <- read_data( params_report$input_file, params_report$design_file, params_report$select_group)
-  #undebug(read_data)
-  if (res$status == 1) stop(res$error)
-  ## get global statistics
+    # 1. Resolve the filename for Quarto
+    t_file <- validate_template(t_id)
+    # --- 2. Data Processing (The "Logic" Layer) ---
+    # This returns the named list "Data Bag"
+    # You can change 'analysis_type' to trigger different logic branches later
+    data_ <- process_nterm_data(params_report, analysis_type = t_id)
 
-  stat_reg <- list(list(logic = expr(  grepl('N-term*', pep_var_mod, fixed = FALSE)),  calc_pct = TRUE ),
-                  list(logic = expr(  grepl('*Ace*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE),
-                  list(logic =  expr( grepl('*Gln*', pep_var_mod, fixed = FALSE) ),  calc_pct = FALSE) ,
-                  list( logic = expr( mascot_task == task[2] & ! str_ends(pep_seq, "R")) , calc_pct = TRUE),
-                  list( logic = expr( mascot_task == task[1] &  str_detect( pep_seq,'H') )  , calc_pct = TRUE),
-                  list(logic= expr(mascot_task == task[2]), calc_pct = TRUE)
-                )
-  stat_name  <- c('N-terminally','Ace','Gln-NtermQ', 'C-terminal', 'N-terminally with H','NH2'  )
-  res_a <- global_PSM_general( res$nterm_data, stat_reg, stat_name)
-  if (res_a$status == 1) stop(res_a$error)
+    unique_output <- paste0(report_filename, "_", t_id, ".html")
+    log_info('End processing for {t_id}...')
+      res_write <- write_final_result(acetyl = data_$export_data$acetyl_table, 
+                          pep_dump = data_$export_data$pep_dump,
+                          quant_base = NULL,
+                          group_l = NULL,
+                          path =  report_folder )
 
-  res_bb <- global_PEP_general( res$nterm_pep, res$df_design )
-  if (res_bb$status == 1) stop(res_bb$error)
-  
-  ## prev. version keep for legacy now 
-  # res_a <- global_stat( res$nterm_data)
-  # if (res_a$status == 1) stop(res_a$error)
-  # ## group stats
-  # res_b <- group_stat( res$nterm_data)
-  # if (res_b$status == 1) stop(res_b$error)
+    log_info ('Starting Visualization  ...')
 
-  # res_c <- sample_stat( res$nterm_data)
-  # if (res_c$status == 1) stop(res_c$error)
-
-  # res_acetyl <- acetyl_stat_( res$nterm_data)
-  # if (res_acetyl$status == 1) stop(res_acetyl$error)
-
-  # res_acd4  <- acd4_stat_( res$nterm_data)
-  # if (res_acd4$status == 1) stop(res_acd4$error)
-
-  # res_base <- quant_base_(res$nterm_data)
-  # if (res_base$status == 1) stop(res_base$error)
-
-  # list_group <- res$df_design %>% dplyr::distinct(Group) %>% pull()
-  # res_write <- write_final_result(acetyl = res_acetyl$res, acd4 = res_acd4$res,
-  #                     quant_base = res_base$res,
-  #                     group_l = list_group,
-  #                     path =  report_folder )
-  # if (res_write$status == 1) stop(res_write$error)
-
-  log_info ('End processing  ...')
-  log_info ('Starting Visualization  ...')
-
-  template_source_folder <- system.file("quarto_template", package = "ntermreport")
-  if (template_source_folder == "") {
-    stop("Template folder not found in the package.")
+    render_quarto_template( data_list = data_$quarto_data,
+      template_name = t_file,
+      report_fld = report_folder, 
+      report_fname= unique_output, 
+      params_report = params_report
+    )
   }
-
-
-  # Create a unique temporary working directory
-  temp_work_dir <- file.path(tempdir(), paste0("quarto_temp_", Sys.getpid()))
-  dir.create(temp_work_dir, recursive = TRUE, showWarnings = FALSE)
-  log_info('Temp folder created : {temp_work_dir}')
-
-  # Copy the entire template folder content to the temporary directory
-  # This copies all files and subfolders (e.g., resource folders with JS/CSS files)
-  success <- file.copy(from = template_source_folder,
-                       to = temp_work_dir,
-                       recursive = TRUE)
-  if (!success) {
-    stop("Failed to copy the template folder to the temporary directory.")
   }
-  log_info('Copy Template file ...done')
-  ## new template dev 
-  saveRDS(res_a$res, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat.RDS'  ))
-  saveRDS(res_a$res_sample, file.path(temp_work_dir,basename(template_source_folder), 'glob_stat_sample.RDS'  ))
- 
-  saveRDS(res_bb$pep_cnt_sample, file.path(temp_work_dir,basename(template_source_folder), 'pep_id.RDS'  ))
-  saveRDS(res_bb$pep_cnt_group, file.path(temp_work_dir,basename(template_source_folder), 'pep_id_grp.RDS'  ))
-  saveRDS(res_bb$ace_group, file.path(temp_work_dir,basename(template_source_folder), 'pep_ace_grp.RDS'  ))
-  saveRDS(res_bb$ace_sample, file.path(temp_work_dir,basename(template_source_folder), 'pep_ace.RDS'  ))
-
-
-  params_report$glb_stat <-   file.path( temp_work_dir,basename(template_source_folder),'glob_stat.RDS'  )
-  params_report$grp_stat <-   file.path( temp_work_dir,basename(template_source_folder),'glob_stat_sample.RDS'  )
-
-  params_report$pep_id <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id.RDS'  )
-  params_report$pep_id_group <-   file.path( temp_work_dir,basename(template_source_folder),'pep_id_grp.RDS'  )
-  params_report$ace_group <-  file.path( temp_work_dir,basename(template_source_folder),'pep_ace_grp.RDS'  )
-  params_report$ace_ <-  file.path( temp_work_dir,basename(template_source_folder),'pep_ace.RDS'  )
-
-
-
-  log_info('Copy Rds Results ...done')
-
-   # Construct the path to the copied template file in the temp directory.
-  # Assumes that the template file is directly inside the copied folder.
-  temp_template_path <- file.path(temp_work_dir, basename(template_source_folder), template)
-  if (!file.exists(temp_template_path)) {
-    stop("Template file not found in the temporary directory: ", temp_template_path)
-  }
-
-  path <- file.path(temp_work_dir, basename(template_source_folder))
-
-  tryCatch({
-    withr::with_dir(path, {
-      quarto_render(
-        input = temp_template_path,
-        output_format = "html",
-        output_file = report_filename,
-        execute_params = params_report,
-        quarto_args = c( "--no-clean", "--output-dir", path)
-      )
-    })
-  }, error = function(e) {
-    print("Error in Quarto rendering:")
-    print(e$message)
-    print("Cleaning Temp folder")
-    unlink(temp_work_dir, recursive = TRUE)
-    stop(e)
-  })
-
-  resource_folder_name <- paste0(tools::file_path_sans_ext(report_filename), "_files")
-  rendered_report_path <- file.path(path, report_filename)
-
-
-  if (!dir.exists(report_folder)) {
-    dir.create(report_folder, recursive = TRUE)
-  }
-
-
-  log_info('Copying rendered html report ...')
-  # Copy the rendered HTML report to the target folder
-  file.copy(from = rendered_report_path, to = file.path(report_folder, report_filename), overwrite = TRUE)
-  # If a resource folder was generated, copy it as well
-  temp_resource_path <- file.path(temp_work_dir, resource_folder_name)
-  if (dir.exists(temp_resource_path)) {
-    file.copy(from = temp_resource_path,
-              to = file.path(report_folder, resource_folder_name),
-              recursive = TRUE, overwrite = TRUE)
-  }
-
-  log_info('Cleaning temp folder ...')
-  # Optionally, remove the temporary working directory to clean up
-  unlink(temp_work_dir, recursive = TRUE)
-
-
-}

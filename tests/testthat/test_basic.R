@@ -1,83 +1,54 @@
 library(testthat)
 library(dplyr)
+library(stringr)
 
-test_that("Global_stat", {
-      data  <- readRDS(  testthat::test_path("Nterm_DDa.Rds"))
-
-      out <- global_stat( data) 
+test_that("process_nterm_data integration base", {
+    mock_pep <- readRDS(testthat::test_path("pep_small.Rds"))
+    mock_psm <- readRDS(testthat::test_path("psm_small.Rds"))
+    mock_design <- readRDS(testthat::test_path("design_small.Rds"))
+    
+   my_test_path <- file.path(tempdir(), paste0("run_test_", Sys.getpid()))
+    
+    if (!dir.exists(my_test_path)) {
+        dir.create(my_test_path, recursive = TRUE)
+    }
+    
+    # 3. Define the specific filenames
+    # Now file.path will definitely see a character string
+    path_psm  <- file.path(my_test_path, "mock_data_psm.tsv")
+    path_pep  <- file.path(my_test_path, "mock_output_peptide.tsv")
+    path_csv  <- file.path(my_test_path, "design.csv")
   
-   expected_first_row <- c(a = 'pyroglu_', b  = 1421, c = 3.12383213524149)
+    write.table(mock_pep, path_pep, sep = "\t", row.names = FALSE)
+    write.table(mock_psm, path_psm, sep = "\t", row.names = FALSE)
+    write.table(mock_design, path_csv, sep = ";", row.names = FALSE)
+    
   
-  expect_equal(out$status,0) # Result is done 
-  expect_equal( colnames(out$res), c( 'label','count_absolute','percentage') ) # column names  expected
-  expect_equal(dim(out$res), c(5, 3)) ## expected dimention 
-  expect_equal(as.character(out$res[1, ]), as.character(expected_first_row)) # check fist row
+   params <- list(
+    input_file = path_psm,
+    design_file = path_csv,
+    title = 'PRC-6253 ',
+    subtitle = "N-Terminal Evy Dev",
+    author = 'Dev',
+    select_group= list(A_ = c('WT','NAA80KO'))
+  )
+  
+  out <- process_nterm_data(params, analysis_type = "id_")
 
+  expect_type(out, "list")
+  expect_named(out$quarto_data, c("glb_stat", "grb_stat", "pep_id", 
+                                  "pep_id_group", "ace_group", "ace_sample"))
+  expect_equal(nrow(out$quarto_data$glb_stat),9)
+  expect_equal(nrow(out$quarto_data$grb_stat),54)
+  expect_equal(nrow(out$quarto_data$pep_id),6)
+  expect_equal(nrow(out$quarto_data$pep_id_group),6)
+  expect_equal(length(out$quarto_data$ace_group),6)
+  expect_equal(length(out$quarto_data$ace_sample),6)
 
-} )
+  expect_named(out$export_data, c("acetyl_table", "pep_dump"))
+  expect_equal(nrow(out$export_data$pep_dump),800)
+  # Cleanup (Optional, R usually cleans tempdir() on exit)
+  unlink(c(path_psm, path_pep, path_csv))
+} 
+)
 
-
-test_that("Group_stat", {
-      data  <- readRDS(  testthat::test_path("Nterm_DDa.Rds"))
-     
-      out <- group_stat( data) 
-   
-  #print( length( out$l_uniq_protein$NR ))
-  expect_protein_id <- c('P07108','P62316','P04424','P51888')
-  expect_equal(out$status,0) # Result is done 
-  expect_equal(dim(out$res), c(24, 4)) ## expected dimention 
-
-  expect_false( is.null( out$l_uniq_protein)  ) # list uniq protein should not be NULL
-  expect_equal(length( out$l_uniq_protein$RPE ),2198) # uniq protein list RPE
-  expect_contains( out$l_uniq_protein$RPE, expect_protein_id) # expected protein ID
-  expect_equal(length( out$l_uniq_protein$NR ),1833) # uniq protein list NR
-
-} )
-
-
-test_that("Sample_stat", {
-      data  <- readRDS(  testthat::test_path("Nterm_DDa.Rds"))
-     
-      out <- sample_stat( data) 
-   
-  expect_protein_id <- c('P07108','P62316','P63215','Q14012')
-  expect_equal(out$status,0) # Result is done 
-  expect_equal(dim(out$res), c(64, 4)) ## expected dimention 
-
-  expect_false( is.null( out$l_uniq_protein)  ) # list uniq protein should not be NULL
-  expect_equal(length(out$l_uniq_protein$NR_1),1268) # uniq protein list RPE_1
-  expect_equal(length(out$l_uniq_protein$NR_2),1337)# uniq protein list RPE_2
-  expect_equal(length(out$l_uniq_protein$NR_3),1460)# uniq protein list RPE_3
-  expect_contains( out$l_uniq_protein$NR_1, expect_protein_id) # expected protein ID
-
-} )
-
-
-test_that("acetyl_stat", {
-      data  <- readRDS(  testthat::test_path("Nterm_DDa.Rds"))
-     
-      out <- acetyl_stat_( data) 
-
-  expect_protein_id <- c('P07108','P62316','P63215','Q14012')
-  expect_equal(out$status,0) # Result is done 
-  expect_equal(length(out$res), 3) ## expected dimention 
-  expect_equal(dim(out$res$NR$p_start_), c(637, 63)) ## expected dimention
-  expect_equal(dim(out$res$NR$p_atis), c(51, 63)) ## expected dimention
-  expect_equal(dim(out$res$RPE$p_start_), c(634, 63)) ## expected dimention
-  expect_equal(dim(out$res$RPE$p_atis), c(53, 63)) ## expected dimention
-
-} )
-
-test_that("acd4_stat", {
-      data  <- readRDS(  testthat::test_path("Nterm_DDa.Rds"))
-     
-      out <- acd4_stat_( data) 
-
-  expect_equal(out$status,0) # Result is done 
-  expect_equal(length(out$res), 3) ## expected dimention 
-  expect_equal(dim(out$res$NR$p_start_), c(160, 63)) ## expected dimention
-  expect_equal(dim(out$res$NR$p_atis), c(59, 63)) ## expected dimention
-  expect_equal(dim(out$res$RPE$p_start_), c(149, 63)) ## expected dimention
-  expect_equal(dim(out$res$RPE$p_atis), c(55, 63)) ## expected dimention
-
-} )

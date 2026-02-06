@@ -11,6 +11,15 @@ render_ntermdia_report(
   report_filename
 )
 }
+\arguments{
+\item{params_report}{List of parameters for the report.}
+
+\item{template_file}{Path to the .qmd template.}
+
+\item{report_target_folder}{Directory to save the output.}
+
+\item{report_filename}{Name of the output file}
+}
 \description{
 render_dia_report
 }

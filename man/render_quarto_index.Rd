@@ -6,6 +6,13 @@
 \usage{
 render_quarto_index(report_info, out_file = "", title = "")
 }
+\arguments{
+\item{report_info}{report}
+
+\item{out_file}{output file}
+
+\item{title}{title of the}
+}
 \description{
 render_quarto_index
 }

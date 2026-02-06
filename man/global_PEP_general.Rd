@@ -7,19 +7,19 @@
 global_PEP_general(pep_nterm, design)
 }
 \arguments{
-\item{design}{dataframe realted to the design experiment}
+\item{pep_nterm}{input n-terminal data frame parsed from peptide file}
 
-\item{d_nterm}{input n-terminal data frame parsed from peptide file}
+\item{design}{dataframe realted to the design experiment}
 }
 \value{
 A list containing:
 \itemize{
-  \item{error}{ Error message string.}
-  \item{status}{ Status code (0 for success).}
-  \item{pep_cnt_sample}{ Precursor counts per sample.}
-  \item{pep_cnt_group}{ Precursor counts per group.}
-  \item{ace_group}{ Acetylated peptides split by group.}
-  \item{ace_sample}{ Acetylated peptides split by sample.}
+  \item{error} Error message string.
+  \item{status} Status code (0 for success).
+  \item{pep_cnt_sample} Precursor counts per sample.
+  \item{pep_cnt_group} Precursor counts per group.
+  \item{ace_group} Acetylated peptides split by group.
+  \item{ace_sample} Acetylated peptides split by sample.
 }
 }
 \description{

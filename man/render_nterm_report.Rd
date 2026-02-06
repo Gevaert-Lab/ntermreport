@@ -4,12 +4,17 @@
 \alias{render_nterm_report}
 \title{Render a DDA report using a Quarto template}
 \usage{
-render_nterm_report(params_report, template, report_folder, report_filename)
+render_nterm_report(
+  params_report,
+  template_ids,
+  report_folder,
+  report_filename
+)
 }
 \arguments{
 \item{params_report}{parameters}
 
-\item{template}{template name}
+\item{template_ids}{template ids can be a vector}
 
 \item{report_folder}{description}
 

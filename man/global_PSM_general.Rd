@@ -9,17 +9,17 @@ global_PSM_general(d_nterm, stat_reg, stat_name)
 \arguments{
 \item{d_nterm}{A data frame containing PSM-level N-terminal data.}
 
-\item{stat_reg}{A list of regular expressions defining the modifications to search for.}
+\item{stat_reg}{A list of regular expressions (captured as expressions) defining the modifications.}
 
 \item{stat_name}{A character vector of names corresponding to the `stat_reg` patterns.}
 }
 \value{
 A list containing:
 \itemize{
-  \item{error}{ Character string containing error messages, if any.}
-  \item{status}{ Integer status code (0 for success, 1 for error).}
-  \item{res}{ Dataframe of global summary statistics.}
-  \item{res_sample}{ Dataframe of summary statistics broken down by sample.}
+  \item{error} Character string containing error messages, if any.
+  \item{status} Integer status code (0 for success, 1 for error).
+  \item{res} Dataframe of global summary statistics.
+  \item{res_sample} Dataframe of summary statistics broken down by sample.
 }
 }
 \description{

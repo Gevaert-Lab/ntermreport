@@ -7,15 +7,18 @@
 annotate_df(res, type, groups)
 }
 \arguments{
-\item{res}{list with packages to be installed}
+\item{res}{A nested list of data frames containing proteomics results.}
 
-\item{groups}{vector of group label}
+\item{type}{Character string; the sub-list key to access (e.g., "p_start_").}
+
+\item{groups}{A character vector of group labels to compare.}
 }
 \value{
-none
+The modified `res` list with the added `Venn` column in the specified sub-data frames.
 }
 \description{
-This function annotate the df with N groups
+This function annotates a list of data frames with a "Venn" column indicating 
+in which experimental groups each peptide sequence was identified.
 }
 \author{
 Andrea Argentini

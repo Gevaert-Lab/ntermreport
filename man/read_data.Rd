@@ -7,15 +7,25 @@
 read_data(file_nterm, file_expdesign, grp_selected)
 }
 \arguments{
-\item{file_nterm}{Path to input mascot report}
+\item{file_nterm}{Path to input Mascot PSM report (.tsv).}
 
-\item{file_expdesign}{Path to design TSV file}
+\item{file_expdesign}{Path to design file (.csv or .tsv).}
+
+\item{grp_selected}{A named list of group labels for validation.}
 }
 \value{
-Data frame with imported data
+A named list containing:
+\itemize{
+  \item \code{error}: Error message string (empty if success).
+  \item \code{status}: 0 for success, 1 for error.
+  \item \code{nterm_data}: Processed PSM data frame.
+  \item \code{df_design}: Processed design data frame.
+  \item \code{nterm_pep}: Processed peptide data frame.
+}
 }
 \description{
-It imports the mascot PSM report and the experiments design file.
+Imports the Mascot PSM report, discovers the peptide summary file, 
+and joins them with the experimental design file.
 }
 \author{
 Andrea Argentini

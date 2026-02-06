@@ -18,8 +18,8 @@ process_filter_wip(filter_item, filter_label, data, task)
 \value{
 A list containing:
 \itemize{
-  \item{filter_name}{ The provided `filter_label`.}
-  \item{val_count}{ The number of rows (integer) after applying the filter.}
+  \item{filter_name} The provided `filter_label`.
+  \item{val_count} The number of rows (integer) after applying the filter.
 }
 }
 \description{

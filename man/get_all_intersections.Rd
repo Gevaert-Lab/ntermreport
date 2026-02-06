@@ -7,26 +7,14 @@
 get_all_intersections(df)
 }
 \arguments{
-\item{df}{A data.frame with one `Elements` column and one or more logical columns (each representing membership in a set).}
+\item{df}{A data.frame with one "Elements" column and one or more logical columns.}
 }
 \value{
-A named list where each entry corresponds to a non-empty intersection, 
-  containing:
-  \describe{
-    \item{elements}{Character vector of elements in the intersection}
-    \item{count}{Integer count of elements}
-    \item{sets}{Named logical list describing which sets were included/excluded}
-  }
+A named list where each entry corresponds to a non-empty intersection.
 }
 \description{
 Computes all non-empty intersections of logical set membership columns 
-in a given data frame.  
-It systematically generates all possible combinations of inclusion/exclusion 
-across the sets (2^n - 1 combinations for n sets), evaluates which elements 
-belong to each combination using `view_intersection()`, and returns only 
-those intersections that contain one or more elements.  
-Each intersection includes its name, the matched elements, their count, 
-and the logical definition of the combination.
+in a given data frame.
 }
 \author{
 andrea argentini
