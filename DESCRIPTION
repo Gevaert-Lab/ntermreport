@@ -1,7 +1,7 @@
 Package: ntermreport
 Type: Package
 Title: N-terminal proteomics data analysis 
-Version: 0.99.0
+Version: 0.9.0
 Authors@R: c(
     person(
       "Andrea", "Argentini",
@@ -31,11 +31,11 @@ Imports:
     tidyr,
     utils,
     withr,
-    yaml,
-    diareport
+    yaml
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
     htmltools, 
+    diareport,
     reactable
 RoxygenNote: 7.3.2
