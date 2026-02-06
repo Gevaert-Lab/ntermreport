@@ -66,7 +66,7 @@ ENV CHROMOTE_CHROME=/usr/bin/google-chrome
 RUN R -e "install.packages(c('BiocManager','remotes','rlang','openxlsx','tibble','withr','utils','assertthat','fs','DT','tidyr','reactable','stringr','htmltools','purrr','methods','upsetjs','heatmaply','plotly','yaml','logger','glue'), repos='https://cloud.r-project.org', lib='/usr/local/lib/R/site-library'); \
           BiocManager::install(c('QFeatures','msqrob2','MSnbase'), lib='/usr/local/lib/R/site-library'); \
           remotes::install_github('Gevaert-Lab/diareport@v0.9.0', dependencies=TRUE); \ 
-          remotes::install_github('Gevaert-Lab/ntermreport@v${NTERMREPORT_VERSION}', dependencies=TRUE)"
+          remotes::install_github('Gevaert-Lab/ntermreport@${NTERMREPORT_VERSION}', dependencies=TRUE)"
 
 # --------------------------------------------------
 # Verify Installations
